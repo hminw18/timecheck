@@ -111,7 +111,13 @@ const PrivacyPolicyPage = () => {
               <li>필요한 최소한의 데이터만 요청 (calendar.readonly 스코프만 사용)</li>
               <li>Google Calendar 데이터는 읽기 전용으로만 사용</li>
               <li>사용자의 캘린더를 수정하거나 새 일정을 생성하지 않음</li>
-              <li>Google API Terms of Service 및 Developer Policy 완전 준수</li>
+              <li>Google API 서비스 약관 및 개발자 정책 완전 준수</li>
+              <li>Google API 서비스 사용자 데이터 정책 준수</li>
+              <li>제한적 사용 요구사항(Limited Use requirements) 준수</li>
+            </Typography>
+            
+            <Typography variant="body1" paragraph sx={{ mt: 2 }}>
+              TimeCheck의 Google 사용자 데이터 사용은 Google API 서비스 사용자 데이터 정책을 준수하며, 제한적 사용 요구사항을 포함합니다.
             </Typography>
 
             <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 500, mt: 2 }}>

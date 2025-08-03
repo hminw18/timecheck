@@ -184,8 +184,8 @@ const Layout = ({ children, eventDetails }) => {
           >
             © 2025 TimeCheck
           </Typography>
-          <Link 
-            to="/privacy-policy" 
+          <a 
+            href="/privacy-policy" 
             style={{ 
               textDecoration: 'none',
               color: 'inherit'
@@ -203,7 +203,7 @@ const Layout = ({ children, eventDetails }) => {
             >
               개인정보처리방침
             </Typography>
-          </Link>
+          </a>
         </Box>
       </Box>
       

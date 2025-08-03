@@ -34,7 +34,7 @@
   "scripts": {
     "start": "react-app-rewired start",
     "start:network": "set HOST=0.0.0.0 && react-app-rewired start",
-    "build": "react-app-rewired build",
+    "build": "react-app-rewired build && node -e \"require('fs').copyFileSync('public/privacy-policy.html', 'build/privacy-policy.html')\"",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "deploy:config": "node scripts/deploy-config.js",
