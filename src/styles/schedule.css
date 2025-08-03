@@ -1,0 +1,61 @@
+/* Schedule cell styles for better performance */
+.schedule-cell {
+  cursor: pointer;
+  user-select: none;
+  transition: none !important;
+}
+
+/* Base states */
+.schedule-cell-available {
+  background-color: #e3f2fd; /* blue[100] */
+}
+
+.schedule-cell-unavailable {
+  background-color: #ef9a9a; /* red[300] */
+}
+
+.schedule-cell-ifneeded {
+  background-color: #ffc107; /* yellow[500] */
+}
+
+/* Hover states */
+.schedule-cell-available:hover {
+  background-color: #bbdefb; /* blue[200] */
+}
+
+.schedule-cell-unavailable:hover {
+  background-color: #e57373; /* red[400] */
+}
+
+.schedule-cell-ifneeded:hover {
+  background-color: #ffb300; /* yellow[600] */
+}
+
+/* Drag preview states - same as base to avoid repaints */
+.schedule-cell-drag-unavailable {
+  background-color: #ef9a9a; /* red[300] */
+}
+
+.schedule-cell-drag-ifneeded {
+  background-color: #ffc107; /* yellow[500] */
+}
+
+.schedule-cell-drag-available {
+  background-color: #e3f2fd; /* blue[100] */
+}
+
+/* Performance optimizations */
+.schedule-table {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+.schedule-table-body {
+  contain: layout;
+}
+
+/* Prevent layout thrashing */
+.schedule-container {
+  isolation: isolate;
+  transform: translateZ(0);
+}

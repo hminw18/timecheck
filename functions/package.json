@@ -1,0 +1,30 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "setup-secrets": "node setupSecrets.js"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "@google-cloud/secret-manager": "^6.1.0",
+    "cookie-parser": "^1.4.7",
+    "firebase-admin": "^11.8.0",
+    "firebase-functions": "^4.3.1",
+    "google-auth-library": "^9.14.2",
+    "googleapis": "^144.0.0",
+    "ical.js": "^2.2.0",
+    "tsdav": "^2.1.5"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0"
+  },
+  "private": true
+}

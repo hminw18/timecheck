@@ -1,0 +1,66 @@
+{
+  "name": "timecheck",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.2.0",
+    "@mui/material": "^7.2.0",
+    "@mui/x-date-pickers": "^8.7.0",
+    "@mui/x-date-pickers-pro": "^8.8.0",
+    "@react-oauth/google": "^0.12.2",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
+    "firebase": "^11.10.0",
+    "https-browserify": "^1.0.0",
+    "nth-check": "^2.1.1",
+    "os-browserify": "^0.3.0",
+    "process": "^0.11.10",
+    "react": "^19.1.0",
+    "react-app-rewired": "^2.2.1",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.3",
+    "react-scripts": "^5.0.1",
+    "stream-browserify": "^3.0.0",
+    "stream-http": "^3.2.0",
+    "tsdav": "^2.1.5",
+    "url": "^0.11.4",
+    "util": "^0.12.5"
+  },
+  "scripts": {
+    "start": "react-app-rewired start",
+    "start:network": "set HOST=0.0.0.0 && react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test",
+    "eject": "react-scripts eject",
+    "deploy:config": "node scripts/deploy-config.js",
+    "deploy:production": "npm run build && firebase deploy"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11"
+  }
+}

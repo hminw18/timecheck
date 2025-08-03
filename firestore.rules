@@ -1,0 +1,48 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Events: 
+    // - Anyone can read events (for sharing)
+    // - Anyone can create an event (guests included)
+    // - Only the owner can update or delete their event
+    match /events/{eventId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+
+      // Availabilities:
+      // - Anyone can read availability data (for viewing group schedules)
+      // - Anyone can create/update/delete their own availability (guests use guest IDs)
+      match /availabilities/{userId} {
+        allow read: if true;
+        allow create, update, delete: if true;
+      }
+    }
+
+    // Fixed Schedules:
+    // - A user can only read or write their own fixed schedule document.
+    match /fixedSchedules/{userId} {
+      allow read, write: if request.auth != null && userId == request.auth.uid;
+    }
+    
+    // Users:
+    // - A user can only read or write their own user document (calendar connections, settings, etc.)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && userId == request.auth.uid;
+    }
+
+    // Apple Calendar Credentials:
+    // - A user can only read or write their own Apple credentials
+    match /apple_credentials/{userId} {
+      allow read, write: if request.auth != null && userId == request.auth.uid;
+    }
+
+    // Google Calendar Credentials:
+    // - A user can only read or write their own Google credentials
+    match /google_credentials/{userId} {
+      allow read, write: if request.auth != null && userId == request.auth.uid;
+    }
+  }
+}
