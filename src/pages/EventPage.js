@@ -652,10 +652,10 @@ const EventPage = ({
               size="small"
               startIcon={<ShareIcon />}
               onClick={() => {
+                const shareText = `${window.location.href}\n${eventDetails.title}\n\n캘린더 연동 기능을 사용해 TimeCheck에서 쉽고 빠르게 일정을 등록하세요!`;
                 const shareData = {
                   title: eventDetails.title,
-                  text: `${eventDetails.title} 일정 조정`,
-                  url: window.location.href
+                  text: shareText
                 };
                 
                 if (navigator.share) {
@@ -934,9 +934,10 @@ const EventPage = ({
         open={snackbarOpen}
         autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
       >
-        <Alert onClose={() => setSnackbarOpen(false)} severity="success" sx={{ width: '100%' }}>
+        <Alert onClose={() => setSnackbarOpen(false)} severity="success" sx={{ width: '100%', maxWidth: 400 }}>
           {snackbarMessage}
         </Alert>
       </Snackbar>

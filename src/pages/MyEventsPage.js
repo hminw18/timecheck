@@ -212,8 +212,14 @@ const MyEventsPage = () => {
       </Dialog>
       
       {/* Snackbar for notifications */}
-      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleSnackbarClose}>
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%', maxWidth: 400 }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

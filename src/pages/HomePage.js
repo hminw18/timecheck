@@ -28,8 +28,14 @@ const HomePage = ({ handleCreateEvent }) => {
   return (
     <Box sx={{ p: 2, maxWidth: '800px', mx: 'auto', mt: 0, pb: isMobile ? 10 : 2 }}>
       <EventForm setEventDetails={handleCreateEvent} isMobile={isMobile} />
-      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleSnackbarClose}>
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%', maxWidth: 400 }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

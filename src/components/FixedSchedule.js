@@ -270,8 +270,14 @@ const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false
         </Box>
       </ScheduleTable>
 
-      <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={hideSnackbar}>
-        <Alert onClose={hideSnackbar} severity="success" sx={{ width: '100%' }}>
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={3000} 
+        onClose={hideSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
+      >
+        <Alert onClose={hideSnackbar} severity="success" sx={{ width: '100%', maxWidth: 400 }}>
           {snackbarMessage}
         </Alert>
       </Snackbar>

@@ -75,8 +75,14 @@ function EventPageWrapper() {
         respondedUsers={respondedUsers}
         fixedSchedule={fixedSchedule}
       />
-      <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={handleSnackbarClose}>
-        <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%' }}>
+      <Snackbar 
+        open={snackbarOpen} 
+        autoHideDuration={3000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
+      >
+        <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%', maxWidth: 400 }}>
           일정이 저장되었습니다!
         </Alert>
       </Snackbar>

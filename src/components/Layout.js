@@ -6,6 +6,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoginDialog from './LoginDialog';
+import SuggestionDialog from './SuggestionDialog';
 
 const Layout = ({ children, eventDetails }) => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const Layout = ({ children, eventDetails }) => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('error');
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
 
   useEffect(() => {
     if (authError) {
@@ -206,6 +208,22 @@ const Layout = ({ children, eventDetails }) => {
               개인정보처리방침
             </Typography>
           </a>
+          <Typography 
+            variant="caption" 
+            onClick={() => setSuggestionDialogOpen(true)}
+            sx={{
+              fontSize: { xs: '0.65rem', sm: '0.75rem' },
+              cursor: 'pointer',
+              color: '#64b5f6',
+              fontWeight: 500,
+              '&:hover': {
+                textDecoration: 'underline',
+                color: '#5ba3e0'
+              }
+            }}
+          >
+            피드백
+          </Typography>
         </Box>
       </Box>
       
@@ -214,16 +232,22 @@ const Layout = ({ children, eventDetails }) => {
         onClose={() => setLoginDialogOpen(false)} 
       />
       
+      <SuggestionDialog
+        open={suggestionDialogOpen}
+        onClose={() => setSuggestionDialogOpen(false)}
+      />
+      
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
         onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
       >
         <Alert 
           onClose={() => setSnackbarOpen(false)} 
           severity={snackbarSeverity}
-          sx={{ width: '100%' }}
+          sx={{ width: '100%', maxWidth: 400 }}
         >
           {snackbarMessage}
         </Alert>

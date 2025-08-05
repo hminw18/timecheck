@@ -77,6 +77,7 @@ const GuestLogin = ({ onGuestLogin, onGoogleLogin, onAppleLogin }) => {
           <Button
             variant="contained"
             type="submit"
+            disabled={!guestName.trim()}
             disableElevation
             sx={{ 
               minWidth: '60px',

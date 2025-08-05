@@ -386,11 +386,13 @@ const SettingsPage = () => {
         open={snackbar.open} 
         autoHideDuration={3000} 
         onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
       >
         <Alert 
           onClose={() => setSnackbar({ ...snackbar, open: false })} 
           severity={snackbar.severity} 
-          sx={{ width: '100%' }}
+          sx={{ width: '100%', maxWidth: 400 }}
         >
           {snackbar.message}
         </Alert>
