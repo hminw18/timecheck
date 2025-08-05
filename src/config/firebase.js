@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, connectAuthEmulator, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, connectAuthEmulator, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
@@ -65,31 +65,41 @@ const signInWithGoogle = async () => {
   try {
     const provider = createGoogleProvider();
     
-    // Try popup for all browsers including mobile
-    try {
-      const result = await signInWithPopup(auth, provider);
-      
-      // Get the OAuth Access Token (not used in this context)
-      // const credential = GoogleAuthProvider.credentialFromResult(result);
-      // credential?.accessToken;
-      
-      // Google sign-in successful
-      return { 
-        user: result.user
-      };
-    } catch (popupError) {
-      // If popup fails due to COOP or blocked popup, fall back to redirect
-      if (popupError.code === 'auth/popup-blocked' || 
-          popupError.code === 'auth/popup-closed-by-user' ||
-          popupError.message?.includes('Cross-Origin-Opener-Policy')) {
-        // Popup blocked, using redirect method
-        await signInWithRedirect(auth, provider);
-        // Redirect will happen, result will be handled by handleRedirectResult
-        return null;
-      }
-      throw popupError;
-    }
+    const result = await signInWithPopup(auth, provider);
+    
+    // Get the OAuth Access Token (not used in this context)
+    // const credential = GoogleAuthProvider.credentialFromResult(result);
+    // credential?.accessToken;
+    
+    // Google sign-in successful
+    return { 
+      user: result.user
+    };
   } catch (error) {
+    throw error;
+  }
+};
+
+const signInWithApple = async () => {
+  try {
+    const provider = new OAuthProvider('apple.com');
+    provider.addScope('email');
+    provider.addScope('name');
+    
+    // Set custom parameters for Apple
+    provider.setCustomParameters({
+      // Locale
+      locale: 'ko_KR'
+    });
+    
+    const result = await signInWithPopup(auth, provider);
+    
+    // Apple sign-in successful
+    return { 
+      user: result.user
+    };
+  } catch (error) {
+    console.error('Firebase Apple Sign-In Error:', error);
     throw error;
   }
 };
@@ -133,4 +143,4 @@ const logout = () => {
   signOut(auth);
 };
 
-export { app, auth, db, functions, signInWithGoogle, handleRedirectResult, logout };
+export { app, auth, db, functions, signInWithGoogle, signInWithApple, handleRedirectResult, logout };

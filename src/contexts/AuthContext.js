@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth, signInWithGoogle as firebaseSignIn, handleRedirectResult, logout as firebaseSignOut, db } from '../config/firebase';
+import { auth, signInWithGoogle as firebaseSignIn, signInWithApple as firebaseSignInWithApple, handleRedirectResult, logout as firebaseSignOut, db } from '../config/firebase';
 import { doc, setDoc, getDoc, deleteField, updateDoc } from 'firebase/firestore';
 import appleCalendarService from '../services/appleCalendarService';
 
@@ -125,6 +125,36 @@ const AuthProviderContent = ({ children }) => {
     }
   };
 
+  const signInWithApple = async () => {
+    try {
+      setIsLoading(true);
+      const result = await firebaseSignInWithApple();
+      if (result && result.user) {
+        // No need to setIsLoading(false) here, onAuthStateChanged will handle it
+      }
+    } catch (error) {
+      console.error('Apple Sign-In Error:', error);
+      let errorMessage = error.message;
+      
+      // Handle Apple Sign-In specific errors
+      if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'This domain is not authorized for sign-in. Please contact the administrator.';
+        setAuthError(errorMessage);
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'Pop-up was blocked. Please allow pop-ups for this site.';
+        setAuthError(errorMessage);
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Apple Sign-In is not enabled in Firebase. Please enable it in Firebase Console.';
+        setAuthError(errorMessage);
+      } else if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        // For other errors, show more detail
+        setAuthError(`Apple sign-in failed: ${error.message}`);
+      }
+      
+      setIsLoading(false);
+    }
+  };
+
 
   const signOut = async () => {
     try {
@@ -200,6 +230,7 @@ const AuthProviderContent = ({ children }) => {
       user,
       isLoading,
       signIn,
+      signInWithApple,
       signOut,
       googleUser,
       googleToken,

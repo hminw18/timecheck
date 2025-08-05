@@ -33,7 +33,7 @@ const EventPage = ({
   respondedUsers,
   fixedSchedule
 }) => {
-  const { user, signIn } = useAuth();
+  const { user, signIn, signInWithApple } = useAuth();
   const { isConnected: googleConnected } = useGoogleOAuth();
   const {
     // Google Calendar
@@ -718,6 +718,7 @@ const EventPage = ({
               guestUser={guestUser}
               onGuestLogin={handleGuestLogin}
               onGoogleLogin={signIn}
+              onAppleLogin={signInWithApple}
               eventNames={calendarEventNames}
               setEventNames={setCalendarEventNames}
               isLoadingCalendar={isLoadingGoogle || isLoadingApple}

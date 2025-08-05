@@ -5,6 +5,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import LoginDialog from './LoginDialog';
 
 const Layout = ({ children, eventDetails }) => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const Layout = ({ children, eventDetails }) => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('error');
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
 
   useEffect(() => {
     if (authError) {
@@ -143,7 +145,7 @@ const Layout = ({ children, eventDetails }) => {
             ) : (
               <Typography
                 variant="body2"
-                onClick={signIn}
+                onClick={() => setLoginDialogOpen(true)}
                 sx={{
                   cursor: 'pointer',
                   color: '#1976d2',
@@ -206,6 +208,11 @@ const Layout = ({ children, eventDetails }) => {
           </a>
         </Box>
       </Box>
+      
+      <LoginDialog 
+        open={loginDialogOpen} 
+        onClose={() => setLoginDialogOpen(false)} 
+      />
       
       <Snackbar
         open={snackbarOpen}
