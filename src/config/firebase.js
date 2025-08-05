@@ -89,7 +89,7 @@ const signInWithApple = async () => {
     // Set custom parameters for Apple
     provider.setCustomParameters({
       // Locale
-      locale: 'ko_KR'
+      locale: 'ko_KR',
     });
     
     const result = await signInWithPopup(auth, provider);

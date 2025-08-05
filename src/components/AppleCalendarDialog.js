@@ -14,15 +14,21 @@ const AppleCalendarDialog = ({
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [tokenGenerated, setTokenGenerated] = useState(false);
   
   // Generate CSRF token when dialog opens
   useEffect(() => {
-    if (open) {
+    if (open && !tokenGenerated) {
       generateToken();
       setIsSubmitting(false); // Reset submission state when dialog opens
       setError(''); // Clear any previous errors
+    } else if (!open) {
+      // Reset token state when dialog closes
+      setTokenGenerated(false);
+      setCsrfToken('');
+      setEndpoint('');
     }
-  }, [open]);
+  }, [open, tokenGenerated]);
   
   const generateToken = async () => {
     setIsGeneratingToken(true);
@@ -55,8 +61,10 @@ const AppleCalendarDialog = ({
       
       setCsrfToken(result.data.token);
       setEndpoint(result.data.endpoint);
+      setTokenGenerated(true);
     } catch (err) {
-      setError('Failed to initialize secure connection');
+      console.error('Token generation error:', err);
+      setError('보안 연결 초기화에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsGeneratingToken(false);
     }
@@ -182,8 +190,20 @@ const AppleCalendarDialog = ({
                   type="button"
                   onClick={onClose} 
                   disabled={externalLoading || isSubmitting} 
-                  size="small" 
-                  sx={{ textTransform: 'none' }}
+                  variant="outlined"
+                  sx={{ 
+                    textTransform: 'none',
+                    fontSize: '0.75rem',
+                    py: 0.25,
+                    px: 2,
+                    minHeight: 28,
+                    borderColor: 'divider',
+                    color: 'text.primary',
+                    '&:hover': {
+                      borderColor: 'text.secondary',
+                      backgroundColor: 'action.hover'
+                    }
+                  }}
                 >
                   취소
                 </Button>
@@ -191,8 +211,14 @@ const AppleCalendarDialog = ({
                   type="submit"
                   variant="contained" 
                   disabled={externalLoading || !csrfToken || isSubmitting} 
-                  size="small" 
-                  sx={{ textTransform: 'none' }}
+                  disableElevation
+                  sx={{ 
+                    textTransform: 'none',
+                    fontSize: '0.75rem',
+                    py: 0.25,
+                    px: 2,
+                    minHeight: 28
+                  }}
                 >
                   {externalLoading || isSubmitting ? '연결 중...' : '연결'}
                 </Button>
