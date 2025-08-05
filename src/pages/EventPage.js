@@ -142,13 +142,18 @@ const EventPage = ({
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       
-      // For day-based events, calculate width based on selected days
+      // Calculate width based on actual selected dates
       let estimatedWidth;
       if (eventDetails.eventType === 'day') {
         const daysCount = eventDetails.selectedDays ? eventDetails.selectedDays.length : 0;
         estimatedWidth = (daysCount * 60) + 200; // Each day column is narrower
       } else {
-        estimatedWidth = (availableWeeks.length * 300) + 200;
+        // For date-based events, count actual dates, not weeks
+        const totalDates = availableWeeks.reduce((count, weekStart) => {
+          const weekDays = getDaysForWeekUtil(weekStart, eventDetails);
+          return count + weekDays.length;
+        }, 0);
+        estimatedWidth = (totalDates * 60) + 200; // Use same width per date as day-based events
       }
       
       setShouldStack(mobile || estimatedWidth > 1200);
