@@ -26,7 +26,8 @@ const MySchedule = ({
   isMobile, 
   guestUser, 
   onGuestLogin, 
-  onGoogleLogin 
+  onGoogleLogin,
+  onAppleLogin 
 }) => {
   const { user } = useAuth();
   const [currentSelectionType, setCurrentSelectionType] = useState('unavailable');
@@ -272,7 +273,7 @@ const MySchedule = ({
   if (!user && !guestUser) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', p: 2, gap: 2 }}>
-        <GuestLogin onGuestLogin={onGuestLogin} onGoogleLogin={onGoogleLogin} />
+        <GuestLogin onGuestLogin={onGuestLogin} onGoogleLogin={onGoogleLogin} onAppleLogin={onAppleLogin} />
       </Box>
     );
   }
@@ -654,7 +655,6 @@ const MySchedule = ({
         }
       </ScheduleTable>
       </Box>
-
       
       <Dialog open={calendarDialogOpen} onClose={closeDialog} fullWidth maxWidth="xs">
         <DialogTitle sx={{ pb: 1.5 }}>일정 연동</DialogTitle>
