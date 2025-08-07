@@ -84,10 +84,9 @@ const MostAvailableTimes = ({ groupSchedule, totalMembers, excludeIfNeeded = fal
     const topSlots = sortedSlots
       .filter(slot => slot.count === maxCount);
 
-    // Group consecutive time slots by date
-    const groupedSlots = [];
-    let currentGroup = null;
-
+    // Group time slots by date (all slots for same date in one group)
+    const dateGroups = new Map();
+    
     topSlots.forEach(slot => {
       const parts = slot.slotId.split('-');
       let date, time;
@@ -102,83 +101,134 @@ const MostAvailableTimes = ({ groupSchedule, totalMembers, excludeIfNeeded = fal
         time = parts[3]; // HH:mm
       }
       
-      const hour = parseInt(time.split(':')[0]);
-      const minute = parseInt(time.split(':')[1]);
-
-      // Check if this slot is consecutive to the current group
-      let isConsecutive = false;
-      if (currentGroup && currentGroup.date === date) {
-        if (currentGroup.endMinute === 0 && minute === 30 && hour === currentGroup.endHour) {
-          // Current group ends at :00, this slot is :30 of the same hour
-          isConsecutive = true;
-        } else if (currentGroup.endMinute === 30 && minute === 0 && hour === currentGroup.endHour + 1) {
-          // Current group ends at :30, this slot is :00 of the next hour
-          isConsecutive = true;
-        }
-      }
-
-      if (!currentGroup || currentGroup.date !== date || !isConsecutive) {
-        // Start a new group
-        if (currentGroup) {
-          groupedSlots.push(currentGroup);
-        }
-        currentGroup = {
+      if (!dateGroups.has(date)) {
+        dateGroups.set(date, {
           date,
-          startTime: time,
-          endTime: time,
-          startHour: hour,
-          startMinute: minute,
-          endHour: hour,
-          endMinute: minute,
+          timeRanges: [],
           count: slot.count,
           percentage: slot.percentage,
-          slots: [slot],  // Keep track of all slots in this group
-          isDayBased: eventDetails && eventDetails.eventType === 'day'
-        };
-      } else {
-        // Extend current group
-        currentGroup.endTime = time;
-        currentGroup.endHour = hour;
-        currentGroup.endMinute = minute;
-        currentGroup.slots.push(slot);  // Add this slot to the group
+          isDayBased: eventDetails && eventDetails.eventType === 'day',
+          allSlots: []
+        });
       }
+      
+      dateGroups.get(date).allSlots.push(slot);
     });
-
-    if (currentGroup) {
-      groupedSlots.push(currentGroup);
-    }
+    
+    // Process each date group to find consecutive time ranges
+    const groupedSlots = [];
+    dateGroups.forEach(dateGroup => {
+      const sortedSlots = dateGroup.allSlots.sort((a, b) => {
+        const timeA = a.slotId.split('-').pop();
+        const timeB = b.slotId.split('-').pop();
+        return timeA.localeCompare(timeB);
+      });
+      
+      const timeRanges = [];
+      let currentRange = null;
+      
+      sortedSlots.forEach(slot => {
+        const time = slot.slotId.split('-').pop();
+        const hour = parseInt(time.split(':')[0]);
+        const minute = parseInt(time.split(':')[1]);
+        
+        if (!currentRange) {
+          currentRange = {
+            startTime: time,
+            endTime: time,
+            startHour: hour,
+            startMinute: minute,
+            endHour: hour,
+            endMinute: minute,
+            slots: [slot]
+          };
+        } else {
+          // Check if consecutive
+          let isConsecutive = false;
+          if (currentRange.endMinute === 0 && minute === 30 && hour === currentRange.endHour) {
+            isConsecutive = true;
+          } else if (currentRange.endMinute === 30 && minute === 0 && hour === currentRange.endHour + 1) {
+            isConsecutive = true;
+          }
+          
+          if (isConsecutive) {
+            // Extend current range
+            currentRange.endTime = time;
+            currentRange.endHour = hour;
+            currentRange.endMinute = minute;
+            currentRange.slots.push(slot);
+          } else {
+            // Start new range
+            timeRanges.push(currentRange);
+            currentRange = {
+              startTime: time,
+              endTime: time,
+              startHour: hour,
+              startMinute: minute,
+              endHour: hour,
+              endMinute: minute,
+              slots: [slot]
+            };
+          }
+        }
+      });
+      
+      if (currentRange) {
+        timeRanges.push(currentRange);
+      }
+      
+      dateGroup.timeRanges = timeRanges;
+      groupedSlots.push(dateGroup);
+    });
 
     // Format the grouped slots
     return groupedSlots.map(group => {
-      // Calculate the actual end time based on the last slot's end
-      let endHour = group.endHour;
-      let endMinute = group.endMinute + 30; // Add 30 minutes to the last slot
+      const dayLabels = {
+        'Mon': '월요일',
+        'Tue': '화요일',
+        'Wed': '수요일',
+        'Thu': '목요일',
+        'Fri': '금요일',
+        'Sat': '토요일',
+        'Sun': '일요일'
+      };
       
-      if (endMinute >= 60) {
-        endHour += 1;
-        endMinute = 0;
-      }
-      
-      let endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
-      
-      // Ensure end time doesn't exceed event end time
-      if (eventDetails && eventDetails.endTime) {
-        const eventEndHour = parseInt(eventDetails.endTime.split(':')[0]);
-        const eventEndMinute = parseInt(eventDetails.endTime.split(':')[1]);
-        if (endHour > eventEndHour || (endHour === eventEndHour && endMinute > eventEndMinute)) {
-          endTime = eventDetails.endTime;
+      // Format time ranges for this date
+      const formattedTimeRanges = group.timeRanges.map(range => {
+        let endHour = range.endHour;
+        let endMinute = range.endMinute + 30; // Add 30 minutes to the last slot
+        
+        if (endMinute >= 60) {
+          endHour += 1;
+          endMinute = 0;
         }
-      }
+        
+        let endTime = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+        
+        // Ensure end time doesn't exceed event end time
+        if (eventDetails && eventDetails.endTime) {
+          const eventEndHour = parseInt(eventDetails.endTime.split(':')[0]);
+          const eventEndMinute = parseInt(eventDetails.endTime.split(':')[1]);
+          if (endHour > eventEndHour || (endHour === eventEndHour && endMinute > eventEndMinute)) {
+            endTime = eventDetails.endTime;
+          }
+        }
+        
+        return {
+          timeRange: `${range.startTime} ~ ${endTime}`,
+          slots: range.slots
+        };
+      });
       
-      // Find users who are available for ALL slots in this time range
+      // Find users who are available for ALL slots across ALL time ranges for this date
       const allAvailableUsers = new Map();
       const allIfNeededUsers = new Map();
-      const slotCount = group.slots.length;
+      const totalSlotCount = group.allSlots.length;
       const userAvailabilityCounts = new Map();
       const userIfNeededCounts = new Map();
       
       // Count how many slots each user is available for
-      group.slots.forEach(slot => {
+      group.allSlots.forEach(slot => {
         slot.availableUsers?.forEach(user => {
           const key = user.id || user.userId || user.name;
           if (!userAvailabilityCounts.has(key)) {
@@ -195,35 +245,25 @@ const MostAvailableTimes = ({ groupSchedule, totalMembers, excludeIfNeeded = fal
         });
       });
       
-      // Only include users who are available for ALL slots in the range
+      // Only include users who are available for ALL slots
       userAvailabilityCounts.forEach((data, key) => {
-        if (data.count === slotCount) {
+        if (data.count === totalSlotCount) {
           allAvailableUsers.set(key, data.user);
         }
       });
       userIfNeededCounts.forEach((data, key) => {
-        if (data.count === slotCount) {
+        if (data.count === totalSlotCount) {
           allIfNeededUsers.set(key, data.user);
         }
       });
-      
-      const dayLabels = {
-        'Mon': '월요일',
-        'Tue': '화요일',
-        'Wed': '수요일',
-        'Thu': '목요일',
-        'Fri': '금요일',
-        'Sat': '토요일',
-        'Sun': '일요일'
-      };
 
       return {
         date: group.isDayBased ? dayLabels[group.date] || group.date : dayjs(group.date).format('M/D'),
         dayOfWeek: group.isDayBased ? '' : dayjs(group.date).format('ddd'),
-        timeRange: `${group.startTime} ~ ${endTime}`,
+        timeRanges: formattedTimeRanges,
         count: group.count,
         percentage: group.percentage,
-        key: `${group.date}-${group.startTime}-${group.endTime}`,
+        key: `${group.date}`,
         availableUsers: Array.from(allAvailableUsers.values()),
         ifNeededUsers: Array.from(allIfNeededUsers.values()),
         isDayBased: group.isDayBased
@@ -236,11 +276,12 @@ const MostAvailableTimes = ({ groupSchedule, totalMembers, excludeIfNeeded = fal
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    const textToCopy = mostAvailable.map(slot => 
-      slot.isDayBased 
-        ? `${slot.date} ${slot.timeRange} (${slot.count}/${totalMembers}명)`
-        : `${slot.date} ${slot.timeRange} (${slot.count}/${totalMembers}명)`
-    ).join('\n');
+    const textToCopy = mostAvailable.map(slot => {
+      const timeRangesText = slot.timeRanges.map(tr => tr.timeRange).join(', ');
+      return slot.isDayBased 
+        ? `${slot.date} ${timeRangesText} (${slot.count}/${totalMembers}명)`
+        : `${slot.date} ${timeRangesText} (${slot.count}/${totalMembers}명)`;
+    }).join('\n');
     
     // Check if clipboard API is available
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -358,9 +399,13 @@ const MostAvailableTimes = ({ groupSchedule, totalMembers, excludeIfNeeded = fal
                     {slot.count}/{totalMembers}
                   </Typography>
                 </Box>
-                <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
-                  {slot.timeRange}
-                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                  {slot.timeRanges.map((tr, index) => (
+                    <Typography key={index} variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                      {tr.timeRange}
+                    </Typography>
+                  ))}
+                </Box>
               </Box>
               <Typography variant="caption" color="text.secondary" sx={{ 
                 overflow: 'hidden',

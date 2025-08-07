@@ -11,6 +11,7 @@ import { generateHours, generateAllTimeSlots, getDaysForWeek as getDaysForWeekUt
 const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule, totalMembers, respondedUsers, isStackMode = false }) => {
   const [excludeIfNeeded, setExcludeIfNeeded] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState(new Set());
+  const [highlightBestTimes, setHighlightBestTimes] = useState(false);
   const isMobile = useMediaQuery(`(max-width:${MOBILE_BREAKPOINT}px)`);
   const cellStyle = getCellStyle(isMobile);
 
@@ -28,6 +29,16 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
     const selectedDays = eventDetails.selectedDays || [];
     return selectedDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b));
   };
+
+  // Find the maximum count across all slots
+  const maxCount = useMemo(() => {
+    let max = 0;
+    groupSchedule.forEach((slotData) => {
+      const count = slotData.available.count + (excludeIfNeeded ? 0 : slotData.ifNeeded.count);
+      if (count > max) max = count;
+    });
+    return max;
+  }, [groupSchedule, excludeIfNeeded]);
 
   const getCellData = useMemo(() => {
     const cache = new Map();
@@ -64,17 +75,36 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
       const displayCount = availableCount + (excludeIfNeeded ? 0 : ifNeededCount);
       
       let backgroundColor = 'transparent';
-      if (displayCount > 0) {
-        const totalForIntensity = selectedParticipants.size > 0 ? selectedParticipants.size : totalMembers;
-        const intensity = Math.min(displayCount / totalForIntensity, 1);
-        // Use blue[100] to blue[700] with better distribution
-        const blueValue = Math.round(intensity * 6) * 100 + 100;
-        backgroundColor = blue[Math.min(blueValue, 700)];
+      let textColor = 'inherit';
+      
+      // If "show only best times" mode is on, only show cells with max count
+      if (highlightBestTimes) {
+        if (displayCount === maxCount && maxCount > 0) {
+          // Show best times with blue background
+          const totalForIntensity = selectedParticipants.size > 0 ? selectedParticipants.size : totalMembers;
+          const intensity = Math.min(displayCount / totalForIntensity, 1);
+          const blueValue = Math.round(intensity * 6) * 100 + 100;
+          backgroundColor = blue[Math.min(blueValue, 700)];
+          textColor = 'white';
+        }
+        // Otherwise leave as transparent (empty)
+      } else {
+        // Normal mode - show all times with counts
+        if (displayCount > 0) {
+          const totalForIntensity = selectedParticipants.size > 0 ? selectedParticipants.size : totalMembers;
+          const intensity = Math.min(displayCount / totalForIntensity, 1);
+          const blueValue = Math.round(intensity * 6) * 100 + 100;
+          backgroundColor = blue[Math.min(blueValue, 700)];
+          textColor = 'white';
+        }
       }
 
-      // Use white text for blue backgrounds
-      const textColor = displayCount > 0 ? 'white' : 'inherit';
-      const sx = { backgroundColor, textAlign: 'center', color: textColor, fontWeight: 'bold' };
+      const sx = { 
+        backgroundColor, 
+        textAlign: 'center', 
+        color: textColor, 
+        fontWeight: 'bold'
+      };
       
       let tooltipTitle = "";
       if (filteredAvailableUsers.length > 0) tooltipTitle += `Available: ${filteredAvailableUsers.join(', ')}`;
@@ -85,7 +115,7 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
       cache.set(slotId, { displayCount, sx, tooltipTitle });
     });
     return cache;
-  }, [groupSchedule, excludeIfNeeded, totalMembers, selectedParticipants]);
+  }, [groupSchedule, excludeIfNeeded, totalMembers, selectedParticipants, highlightBestTimes, maxCount]);
 
   const getCellInfo = (slotId) => getCellData.get(slotId) || { displayCount: 0, sx: { backgroundColor: 'transparent', textAlign: 'center', color: 'inherit', fontWeight: 'bold' }, tooltipTitle: '' };
 
@@ -144,7 +174,14 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
     </Box>
   );
 
-  const MostAvailable = () => <MostAvailableTimes groupSchedule={groupSchedule} totalMembers={totalMembers} allDates={allDates} hours={hours} excludeIfNeeded={excludeIfNeeded} eventDetails={eventDetails} />;
+  const MostAvailable = () => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <MostAvailableTimes groupSchedule={groupSchedule} totalMembers={totalMembers} allDates={allDates} hours={hours} excludeIfNeeded={excludeIfNeeded} eventDetails={eventDetails} />
+      <ToggleButtonGroup value={highlightBestTimes} exclusive onChange={(e, newValue) => setHighlightBestTimes(newValue)} aria-label="highlight best times" size="small" fullWidth>
+        <ToggleButton value={true} aria-label="highlight best" sx={{ fontSize: '0.75rem', py: 0.5 }}>최적 시간만 보기</ToggleButton>
+      </ToggleButtonGroup>
+    </Box>
+  );
 
   const Schedule = () => {
     const content = (
