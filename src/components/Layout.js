@@ -3,13 +3,14 @@ import { AppBar, Toolbar, Typography, Container, Box, Avatar, Menu, MenuItem, Ic
 import EventIcon from '@mui/icons-material/Event';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoginDialog from './LoginDialog';
 import SuggestionDialog from './SuggestionDialog';
 
 const Layout = ({ children, eventDetails }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signOut, signIn, authError, setAuthError } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -50,7 +51,7 @@ const Layout = ({ children, eventDetails }) => {
       <AppBar position="static" elevation={0} color="transparent">
         <Container maxWidth="lg">
           <Toolbar sx={{ minHeight: { xs: 64, sm: 56 }, pl: { xs: 1, sm: 0 }, pr: { xs: 2, sm: 0 }, pt: { xs: 1.5, sm: 1 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
               <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
                 <img 
                   src="/timechecklogo.svg"
@@ -62,6 +63,19 @@ const Layout = ({ children, eventDetails }) => {
                   }} 
                 />
               </Link>
+              {location.pathname === '/' && (
+                <Typography 
+                  variant="caption" 
+                  color="text.secondary"
+                  sx={{ 
+                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
+                    ml: 1,
+                    mt: 1
+                  }}
+                >
+                  쉽고 빠른 모임 일정 정하기
+                </Typography>
+              )}
             </Box>
             {user ? (
               <Box>

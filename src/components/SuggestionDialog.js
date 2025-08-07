@@ -35,6 +35,7 @@ const SuggestionDialog = ({ open, onClose }) => {
 
     setLoading(true);
     try {
+      console.log('Submitting to database:', db._databaseId);
       await addDoc(collection(db, 'suggestions'), {
         suggestion: suggestion.trim(),
         email: email.trim() || null,
@@ -55,9 +56,10 @@ const SuggestionDialog = ({ open, onClose }) => {
       onClose();
     } catch (error) {
       console.error('Error submitting suggestion:', error);
+      console.error('Error details:', error.code, error.message);
       setSnackbar({ 
         open: true, 
-        message: '제안 전송에 실패했습니다. 다시 시도해주세요.', 
+        message: `제안 전송에 실패했습니다: ${error.message}`, 
         severity: 'error' 
       });
     } finally {
