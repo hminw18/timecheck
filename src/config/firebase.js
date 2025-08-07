@@ -18,7 +18,7 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services
 const auth = getAuth(app);
-const db = getFirestore(app, 'timecheck2');
+const db = getFirestore(app);
 const functions = getFunctions(app, 'asia-northeast3');
 
 // Set auth persistence to local storage
