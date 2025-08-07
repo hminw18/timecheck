@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   TextField,
   Button,
@@ -33,9 +33,11 @@ export default function EventForm({ setEventDetails, isMobile }) {
   const [endTime, setEndTime] = useState(dayjs().set("hour", 17).set("minute", 0));
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
-  // Drag state for day selection
-  const isDraggingDays = React.useRef(false);
-  const dragModeDayRef = React.useRef('add');
+  // Drag state management
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragAction, setDragAction] = useState(null); // 'selecting' or 'deselecting'
+  const processedDays = useRef(new Set()); // Track which days we've processed in current drag
+  const hasDragged = useRef(false); // Track if we actually dragged
 
   const daysOfWeek = [
     { value: 'Mon', label: '월' },
@@ -57,66 +59,107 @@ export default function EventForm({ setEventDetails, isMobile }) {
   const isTitleValid = title.trim().length > 0;
   const isFormValid = isDateSelected && isTitleValid;
 
-  const toggleDay = (day) => {
-    setSelectedDays(prev => {
-      const newSet = new Set(prev);
-      dragModeDayRef.current === 'add' ? newSet.add(day) : newSet.delete(day);
-      return Array.from(newSet);
-    });
+  // Handle day click (simple toggle)
+  const handleDayClick = (day) => {
+    if (!hasDragged.current) {
+      if (selectedDays.includes(day)) {
+        setSelectedDays(prev => prev.filter(d => d !== day));
+      } else {
+        setSelectedDays(prev => [...prev, day]);
+      }
+    }
   };
 
-  const handleDayPointerDown = (day) => {
-    isDraggingDays.current = true;
-    const isSelected = selectedDays.includes(day);
-    dragModeDayRef.current = isSelected ? 'remove' : 'add';
-    toggleDay(day);
+  // Handle day selection logic for drag
+  const handleDayInteraction = (day, isInitial = false) => {
+    if (isInitial) {
+      // Starting a new drag
+      processedDays.current = new Set([day]);
+      setIsDragging(true);
+      hasDragged.current = false;
+      
+      // Determine action based on current state
+      if (selectedDays.includes(day)) {
+        setDragAction('deselecting');
+      } else {
+        setDragAction('selecting');
+      }
+    } else if (isDragging && !processedDays.current.has(day)) {
+      // Continuing drag to a new day
+      hasDragged.current = true; // Mark that we've actually dragged
+      processedDays.current.add(day);
+      
+      // Apply the action to the first day if this is the first drag move
+      if (processedDays.current.size === 2) {
+        const firstDay = Array.from(processedDays.current)[0];
+        if (dragAction === 'selecting' && !selectedDays.includes(firstDay)) {
+          setSelectedDays(prev => [...prev, firstDay]);
+        } else if (dragAction === 'deselecting' && selectedDays.includes(firstDay)) {
+          setSelectedDays(prev => prev.filter(d => d !== firstDay));
+        }
+      }
+      
+      // Apply action to current day
+      if (dragAction === 'selecting' && !selectedDays.includes(day)) {
+        setSelectedDays(prev => [...prev, day]);
+      } else if (dragAction === 'deselecting' && selectedDays.includes(day)) {
+        setSelectedDays(prev => prev.filter(d => d !== day));
+      }
+    }
   };
 
-  const handleDayPointerEnter = (day) => {
-    isDraggingDays.current && toggleDay(day);
+  // Mouse/touch handlers
+  const handleDayMouseDown = (day, e) => {
+    e.preventDefault();
+    handleDayInteraction(day, true);
+  };
+
+  const handleDayMouseEnter = (day) => {
+    if (isDragging) {
+      handleDayInteraction(day, false);
+    }
   };
 
   const handleDayTouchStart = (day, e) => {
     e.preventDefault();
-    isDraggingDays.current = true;
-    const isSelected = selectedDays.includes(day);
-    dragModeDayRef.current = isSelected ? 'remove' : 'add';
-    toggleDay(day);
+    handleDayInteraction(day, true);
   };
 
-  const handleDayTouchMove = useCallback((e) => {
-    if (!isDraggingDays.current) return;
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
     
     e.preventDefault();
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
     
-    if (element && element.getAttribute('data-day')) {
-      const day = element.getAttribute('data-day');
-      const isSelected = selectedDays.includes(day);
-      
-      // Only toggle if the state differs from drag mode
-      if ((dragModeDayRef.current === 'add' && !isSelected) || 
-          (dragModeDayRef.current === 'remove' && isSelected)) {
-        toggleDay(day);
+    if (element && element.closest('[data-day]')) {
+      const dayElement = element.closest('[data-day]');
+      const day = dayElement.getAttribute('data-day');
+      if (day) {
+        handleDayInteraction(day, false);
       }
     }
-  }, [selectedDays]);
+  };
 
-  // Add event listeners for drag end
-  React.useEffect(() => {
-    const handleEnd = () => (isDraggingDays.current = false);
-    
-    window.addEventListener('pointerup', handleEnd);
-    window.addEventListener('touchmove', handleDayTouchMove, { passive: false });
+  // End drag
+  useEffect(() => {
+    const handleEnd = () => {
+      setIsDragging(false);
+      setDragAction(null);
+      processedDays.current.clear();
+      hasDragged.current = false;
+    };
+
+    window.addEventListener('mouseup', handleEnd);
     window.addEventListener('touchend', handleEnd);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     
     return () => {
-      window.removeEventListener('pointerup', handleEnd);
-      window.removeEventListener('touchmove', handleDayTouchMove);
+      window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
     };
-  }, [handleDayTouchMove]);
+  }, [isDragging, dragAction, selectedDays]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -253,8 +296,9 @@ export default function EventForm({ setEventDetails, isMobile }) {
                       key={day.value}
                       label={day.label}
                       data-day={day.value}
-                      onPointerDown={() => handleDayPointerDown(day.value)}
-                      onPointerEnter={() => handleDayPointerEnter(day.value)}
+                      onClick={() => handleDayClick(day.value)}
+                      onMouseDown={(e) => handleDayMouseDown(day.value, e)}
+                      onMouseEnter={() => handleDayMouseEnter(day.value)}
                       onTouchStart={(e) => handleDayTouchStart(day.value, e)}
                       color={selectedDays.includes(day.value) ? "primary" : "default"}
                       variant={selectedDays.includes(day.value) ? "filled" : "outlined"}
@@ -264,6 +308,7 @@ export default function EventForm({ setEventDetails, isMobile }) {
                         fontSize: '1rem',
                         cursor: 'pointer',
                         touchAction: 'none',
+                        userSelect: 'none',
                         '&:hover': {
                           backgroundColor: selectedDays.includes(day.value) 
                             ? 'primary.dark' 

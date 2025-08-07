@@ -50,8 +50,14 @@ const Layout = ({ children, eventDetails }) => {
     <Box sx={{ bgcolor: 'grey.100', minHeight: '100vh', display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <AppBar position="static" elevation={0} color="transparent">
         <Container maxWidth="lg">
-          <Toolbar sx={{ minHeight: { xs: 64, sm: 56 }, pl: { xs: 1, sm: 0 }, pr: { xs: 2, sm: 0 }, pt: { xs: 1.5, sm: 1 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+          <Toolbar sx={{ minHeight: { xs: 80, sm: 56 }, pl: { xs: 1, sm: 0 }, pr: { xs: 2, sm: 0 }, pt: { xs: 1.5, sm: 1 } }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: { xs: 'flex-start', sm: 'center' },
+              flexDirection: { xs: 'column', sm: 'row' },
+              flexGrow: 1, 
+              gap: { xs: 0.5, sm: 1 } 
+            }}>
               <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
                 <img 
                   src="/timechecklogo.svg"
@@ -69,8 +75,8 @@ const Layout = ({ children, eventDetails }) => {
                   color="text.secondary"
                   sx={{ 
                     fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    ml: 1,
-                    mt: 1
+                    ml: { xs: 0.5, sm: 0.5},
+                    mt: { xs: 0, sm: 1 }
                   }}
                 >
                   쉽고 빠른 모임 일정 정하기
