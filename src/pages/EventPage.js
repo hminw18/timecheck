@@ -723,6 +723,7 @@ const EventPage = ({
               setEventNames={setCalendarEventNames}
               isLoadingCalendar={isLoadingGoogle || isLoadingApple}
               isMobile={isMobile}
+              isStackMode={shouldStack}
             >
               {user && (
                 <Box sx={{ height: '100%', mb: 2 }}>

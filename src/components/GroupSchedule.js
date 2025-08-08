@@ -474,11 +474,15 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
         // --- DESKTOP LAYOUT ---
         <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', width: '100%' }}>
           {/* Table (scrollable) */}
-          <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+          <Box sx={{ 
+            width: 'calc(100% - 220px)', // Fixed width: total - sidebar - gap
+            minWidth: 0,
+            overflow: 'hidden', // Hide overflow to contain the scroll
+          }}>
             <Schedule />
           </Box>
           {/* Sidebar (fixed) */}
-          <Box sx={{ width: '200px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ width: '200px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, pr: 2 }}>
             <Participants />
             <MostAvailable />
           </Box>
