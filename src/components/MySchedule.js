@@ -300,7 +300,7 @@ const MySchedule = ({
             </ToggleButton>
           </ToggleButtonGroup>
         )}
-        {children && !isStackMode && (
+        {children && (
           <Button 
             variant="outlined" 
             size="small" 
@@ -335,7 +335,6 @@ const MySchedule = ({
       {isMobile ? (
         // --- MOBILE LAYOUT ---
         <Box>
-          {children && <Box sx={{ px: 2, mb: 3 }}>{children}</Box>}
           <Box sx={{ position: 'relative', minWidth: 0, overflow: 'hidden' }}>
             {/* Loading overlay - only on table */}
             {isLoadingCalendar && (
