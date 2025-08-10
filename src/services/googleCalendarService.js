@@ -8,6 +8,7 @@ class GoogleCalendarService {
     this.getEventsFunction = httpsCallable(this.functions, 'getGoogleCalendarEvents');
     this.disconnectFunction = httpsCallable(this.functions, 'googleCalendarDisconnect');
     this.checkStatusFunction = httpsCallable(this.functions, 'googleCalendarCheckStatus');
+    this.createEventFunction = httpsCallable(this.functions, 'createGoogleCalendarEvent');
   }
 
   // Exchange authorization code for tokens
@@ -62,6 +63,21 @@ class GoogleCalendarService {
     try {
       const result = await this.disconnectFunction();
       return result.data.success;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Create calendar event
+  async createEvent(title, timeSlots, eventType, selectedDays) {
+    try {
+      const result = await this.createEventFunction({
+        title,
+        timeSlots,
+        eventType,
+        selectedDays
+      });
+      return result.data;
     } catch (error) {
       throw error;
     }

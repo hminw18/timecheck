@@ -1703,3 +1703,202 @@ exports.googleCalendarGetAccessToken = functions.region('asia-northeast3').https
     throw new functions.https.HttpsError("internal", "Authentication failed. Please reconnect.");
   }
 });
+
+// Create Google Calendar Event
+exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const userId = context.auth.uid;
+  
+  // Check rate limit
+  await checkRateLimit(userId, 'calendar_create');
+
+  try {
+    const {
+      title,
+      timeSlots,
+      eventType,
+      selectedDays
+    } = data;
+
+    if (!title || !timeSlots || timeSlots.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'Title and time slots are required');
+    }
+
+    // Get valid access token using refresh token from Firestore
+    const accessToken = await getValidAccessToken(userId);
+    
+    // Initialize Google Calendar API
+    const oauth2Client = new OAuth2Client();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const events = [];
+
+    if (eventType === 'day') {
+      // Create recurring events for day-based events
+      const recurrenceRule = `FREQ=WEEKLY;BYDAY=${selectedDays.map(day => {
+        const dayMap = { Mon: 'MO', Tue: 'TU', Wed: 'WE', Thu: 'TH', Fri: 'FR', Sat: 'SA', Sun: 'SU' };
+        return dayMap[day];
+      }).join(',')}`;
+
+      // Group consecutive time slots
+      const timeRanges = groupConsecutiveTimeSlots(timeSlots);
+
+      for (const range of timeRanges) {
+        const startDateTime = new Date();
+        startDateTime.setHours(parseInt(range.startTime.split(':')[0]), parseInt(range.startTime.split(':')[1]), 0, 0);
+        
+        const endDateTime = new Date();
+        endDateTime.setHours(parseInt(range.endTime.split(':')[0]), parseInt(range.endTime.split(':')[1]), 0, 0);
+
+        const event = {
+          summary: title,
+          start: {
+            dateTime: startDateTime.toISOString(),
+            timeZone: 'Asia/Seoul',
+          },
+          end: {
+            dateTime: endDateTime.toISOString(),
+            timeZone: 'Asia/Seoul',
+          },
+          recurrence: [
+            `RRULE:${recurrenceRule}`
+          ],
+          description: 'Created from TimeCheck'
+        };
+
+        const response = await calendar.events.insert({
+          calendarId: 'primary',
+          resource: event
+        });
+
+        events.push(response.data);
+      }
+    } else {
+      // Create single events for date-based events
+      const eventsByDate = groupTimeSlotsByDate(timeSlots);
+
+      for (const [dateStr, slots] of Object.entries(eventsByDate)) {
+        const timeRanges = groupConsecutiveTimeSlots(slots);
+
+        for (const range of timeRanges) {
+          const startDateTime = new Date(`${dateStr}T${range.startTime}:00`);
+          const endDateTime = new Date(`${dateStr}T${range.endTime}:00`);
+
+          const event = {
+            summary: title,
+            start: {
+              dateTime: startDateTime.toISOString(),
+              timeZone: 'Asia/Seoul',
+            },
+            end: {
+              dateTime: endDateTime.toISOString(),
+              timeZone: 'Asia/Seoul',
+            },
+            description: 'Created from TimeCheck'
+          };
+
+          const response = await calendar.events.insert({
+            calendarId: 'primary',
+            resource: event
+          });
+
+          events.push(response.data);
+        }
+      }
+    }
+
+    console.log(`[createGoogleCalendarEvent] Created ${events.length} events for user ${userId}`);
+
+    return {
+      success: true,
+      eventsCreated: events.length,
+      events: events.map(e => ({ id: e.id, summary: e.summary, start: e.start, end: e.end }))
+    };
+
+  } catch (error) {
+    console.error('[createGoogleCalendarEvent] Error:', error);
+    
+    if (error.code === 401) {
+      throw new functions.https.HttpsError('unauthenticated', 'Google Calendar authentication expired');
+    }
+    
+    throw new functions.https.HttpsError('internal', `Failed to create calendar event: ${error.message}`);
+  }
+});
+
+// Helper function to group consecutive time slots
+function groupConsecutiveTimeSlots(timeSlots) {
+  if (!timeSlots || timeSlots.length === 0) return [];
+
+  // Parse and sort time slots
+  const slots = timeSlots
+    .map(slot => {
+      const time = slot.split('-').pop(); // Get time part (HH:MM)
+      return time;
+    })
+    .sort()
+    .map(time => {
+      const [hours, minutes] = time.split(':').map(Number);
+      return { time, totalMinutes: hours * 60 + minutes };
+    });
+
+  const ranges = [];
+  let currentStart = slots[0];
+  let currentEnd = slots[0];
+
+  for (let i = 1; i < slots.length; i++) {
+    const slot = slots[i];
+    
+    // If this slot is consecutive (30 minutes after the previous)
+    if (slot.totalMinutes === currentEnd.totalMinutes + 30) {
+      currentEnd = slot;
+    } else {
+      // End current range and start a new one
+      ranges.push({
+        startTime: currentStart.time,
+        endTime: addMinutesToTime(currentEnd.time, 30) // Add 30 minutes to end time
+      });
+      currentStart = slot;
+      currentEnd = slot;
+    }
+  }
+
+  // Add the last range
+  ranges.push({
+    startTime: currentStart.time,
+    endTime: addMinutesToTime(currentEnd.time, 30)
+  });
+
+  return ranges;
+}
+
+// Helper function to add minutes to time string
+function addMinutesToTime(timeStr, minutesToAdd) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const totalMinutes = hours * 60 + minutes + minutesToAdd;
+  const newHours = Math.floor(totalMinutes / 60);
+  const newMinutes = totalMinutes % 60;
+  return `${newHours.toString().padStart(2, '0')}:${newMinutes.toString().padStart(2, '0')}`;
+}
+
+// Helper function to group time slots by date
+function groupTimeSlotsByDate(timeSlots) {
+  const eventsByDate = {};
+  
+  for (const slot of timeSlots) {
+    const parts = slot.split('-');
+    const time = parts.pop();
+    const date = parts.join('-');
+    
+    if (!eventsByDate[date]) {
+      eventsByDate[date] = [];
+    }
+    eventsByDate[date].push(time);
+  }
+  
+  return eventsByDate;
+}
