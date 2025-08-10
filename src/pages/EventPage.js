@@ -10,6 +10,7 @@ import MySchedule from '../components/MySchedule';
 import GroupSchedule from '../components/GroupSchedule';
 import CalendarSelectionDialog from '../components/CalendarSelectionDialog';
 import AppleCalendarDialog from '../components/AppleCalendarDialog';
+import LoginDialog from '../components/LoginDialog';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoogleOAuth } from '../contexts/GoogleOAuthContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -34,6 +35,8 @@ const EventPage = ({
   fixedSchedule
 }) => {
   const { user, signIn, signInWithApple } = useAuth();
+  const [shouldShowCalendarDialog, setShouldShowCalendarDialog] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const { isConnected: googleConnected } = useGoogleOAuth();
   const {
     // Google Calendar
@@ -137,6 +140,22 @@ const EventPage = ({
     }
   }, [user]);
 
+  // Show calendar dialog automatically after first login
+  useEffect(() => {
+    if (user && shouldShowCalendarDialog && !guestUser) {
+      // Close login dialog if it's open
+      if (loginDialogOpen) {
+        setLoginDialogOpen(false);
+      }
+      // Small delay to ensure UI is ready
+      const timer = setTimeout(() => {
+        setShowCalendarDialog(true);
+        setShouldShowCalendarDialog(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [user, shouldShowCalendarDialog, guestUser, setShowCalendarDialog, loginDialogOpen]);
+
   useEffect(() => {
     const checkShouldStack = () => {
       const mobile = window.innerWidth < 768;
@@ -163,6 +182,16 @@ const EventPage = ({
     return () => window.removeEventListener('resize', checkShouldStack);
   }, [availableWeeks, eventDetails.eventType, eventDetails.selectedDays]);
 
+
+  const handleOpenLoginDialog = () => {
+    setShouldShowCalendarDialog(true);
+    setLoginDialogOpen(true);
+  };
+
+  const handleLoginDialogClose = () => {
+    setLoginDialogOpen(false);
+    // Don't reset shouldShowCalendarDialog here - let the login success handle it
+  };
 
   const handleGuestLogin = async (name, password) => {
     setIsCheckingGuest(true);
@@ -717,8 +746,8 @@ const EventPage = ({
               onSave={saveFunction}
               guestUser={guestUser}
               onGuestLogin={handleGuestLogin}
-              onGoogleLogin={signIn}
-              onAppleLogin={signInWithApple}
+              onGoogleLogin={handleOpenLoginDialog}
+              onAppleLogin={handleOpenLoginDialog}
               eventNames={calendarEventNames}
               setEventNames={setCalendarEventNames}
               isLoadingCalendar={isLoadingGoogle || isLoadingApple}
@@ -902,6 +931,11 @@ const EventPage = ({
       </Box>
 
       {/* Dialogs and Snackbar */}
+      <LoginDialog
+        open={loginDialogOpen}
+        onClose={handleLoginDialogClose}
+      />
+
       <AppleCalendarDialog
         open={appleDialogOpen}
         onClose={() => setAppleDialogOpen(false)}

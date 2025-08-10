@@ -1,15 +1,18 @@
 {
-  "short_name": "Timecheck",
-  "name": "Timecheck - Group Scheduling",
+  "short_name": "TimeCheck",
+  "name": "TimeCheck - 모임 일정 정하기",
+  "description": "캘린더 연동으로 그룹 일정을 쉽게 조율하세요",
   "icons": [
     {
-      "src": "clock-favicon2.svg",
+      "src": "imagelogo.svg",
       "sizes": "any",
       "type": "image/svg+xml"
     }
   ],
   "start_url": ".",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#1976d2",
-  "background_color": "#ffffff"
+  "background_color": "#ffffff",
+  "categories": ["productivity", "utilities", "social"]
 }

@@ -7,17 +7,30 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import LoginDialog from './LoginDialog';
 import SuggestionDialog from './SuggestionDialog';
+import CalendarSelectionDialog from './CalendarSelectionDialog';
+import AppleCalendarDialog from './AppleCalendarDialog';
+import { useCalendarIntegration } from '../hooks/useCalendarIntegration';
 
 const Layout = ({ children, eventDetails }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut, signIn, authError, setAuthError } = useAuth();
+  const { user, signOut, signIn, authError, setAuthError, isFirstLogin, clearFirstLogin } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('error');
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
+  
+  // Calendar integration
+  const {
+    calendarSelectionDialog,
+    setCalendarSelectionDialog,
+    appleDialogOpen,
+    setAppleDialogOpen,
+    handleAppleCalendarConnect,
+    calendarImportError
+  } = useCalendarIntegration();
 
   useEffect(() => {
     if (authError) {
@@ -27,6 +40,14 @@ const Layout = ({ children, eventDetails }) => {
       setAuthError(null); // Clear error after showing
     }
   }, [authError, setAuthError]);
+
+  // Show calendar dialog for first-time login users
+  useEffect(() => {
+    if (user && isFirstLogin) {
+      setCalendarSelectionDialog(true);
+      clearFirstLogin(); // Clear the first login flag
+    }
+  }, [user, isFirstLogin, setCalendarSelectionDialog, clearFirstLogin]);
 
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
@@ -105,18 +126,15 @@ const Layout = ({ children, eventDetails }) => {
                   open={Boolean(anchorEl)} 
                   onClose={handleMenuClose}
                   PaperProps={{
-                    elevation: 4,
+                    elevation: 0,
                     sx: {
                       overflow: 'visible',
-                      filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.1))',
-                      mt: 1.5,
-                      minWidth: 220,
-                      '& .MuiAvatar-root': {
-                        width: 32,
-                        height: 32,
-                        ml: -0.5,
-                        mr: 1,
-                      },
+                      filter: 'drop-shadow(0px 4px 12px rgba(0,0,0,0.08))',
+                      mt: 1,
+                      minWidth: { xs: 180, sm: 200 },
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
                       '&:before': {
                         content: '""',
                         display: 'block',
@@ -128,40 +146,137 @@ const Layout = ({ children, eventDetails }) => {
                         bgcolor: 'background.paper',
                         transform: 'translateY(-50%) rotate(45deg)',
                         zIndex: 0,
+                        borderLeft: '1px solid',
+                        borderTop: '1px solid',
+                        borderColor: 'divider',
                       },
                     },
                   }}
                   transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                   anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                 >
-                  <Box sx={{ px: 2, py: 1.5 }}>
-                    <Typography variant="subtitle2" fontWeight={600}>
-                      {user.displayName}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {user.email}
-                    </Typography>
+                  <Box sx={{ 
+                    px: 2, 
+                    py: { xs: 1.25, sm: 1.5 }, 
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(25, 118, 210, 0.02) 100%)'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Avatar 
+                        src={user.photoURL} 
+                        alt={user.displayName}
+                        sx={{ width: 36, height: 36 }}
+                      />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography 
+                          variant="body2" 
+                          fontWeight={600}
+                          sx={{ 
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {user.displayName}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          color="text.secondary"
+                          sx={{ 
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            fontSize: '0.7rem'
+                          }}
+                        >
+                          {user.email}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <MenuItem onClick={handleShowMyEvents} sx={{ py: 1 }}>
-                    <ListItemIcon>
-                      <EventIcon fontSize="small" color="primary" />
-                    </ListItemIcon>
-                    <ListItemText>내 이벤트</ListItemText>
-                  </MenuItem>
-                  <MenuItem onClick={handleShowSettings} sx={{ py: 1 }}>
-                    <ListItemIcon>
-                      <SettingsIcon fontSize="small" color="action" />
-                    </ListItemIcon>
-                    <ListItemText>설정</ListItemText>
-                  </MenuItem>
-                  <Divider sx={{ my: 1 }} />
-                  <MenuItem onClick={handleSignOut} sx={{ py: 1, color: 'error.main' }}>
-                    <ListItemIcon>
-                      <LogoutIcon fontSize="small" color="error" />
-                    </ListItemIcon>
-                    <ListItemText>로그아웃</ListItemText>
-                  </MenuItem>
+                  <Box sx={{ py: 0.25 }}>
+                    <MenuItem 
+                      onClick={handleShowMyEvents} 
+                      sx={{ 
+                        py: { xs: 0.5, sm: 0.75 },
+                        px: 2,
+                        fontSize: '0.875rem',
+                        borderRadius: 0,
+                        minHeight: { xs: 36, sm: 'auto' },
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        }
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        <EventIcon sx={{ fontSize: 18 }} color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primaryTypographyProps={{ 
+                          fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                          fontWeight: 500
+                        }}
+                      >
+                        내 이벤트
+                      </ListItemText>
+                    </MenuItem>
+                    <MenuItem 
+                      onClick={handleShowSettings} 
+                      sx={{ 
+                        py: { xs: 0.5, sm: 0.75 },
+                        px: 2,
+                        fontSize: '0.875rem',
+                        borderRadius: 0,
+                        minHeight: { xs: 36, sm: 'auto' },
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        }
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        <SettingsIcon sx={{ fontSize: 18 }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primaryTypographyProps={{ 
+                          fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                          fontWeight: 500
+                        }}
+                      >
+                        설정
+                      </ListItemText>
+                    </MenuItem>
+                  </Box>
+                  <Divider sx={{ my: 0.25 }} />
+                  <Box sx={{ py: 0.25 }}>
+                    <MenuItem 
+                      onClick={handleSignOut} 
+                      sx={{ 
+                        py: { xs: 0.5, sm: 0.75 },
+                        px: 2,
+                        fontSize: '0.875rem',
+                        borderRadius: 0,
+                        minHeight: { xs: 36, sm: 'auto' },
+                        '&:hover': {
+                          backgroundColor: 'rgba(211, 47, 47, 0.04)',
+                        }
+                      }}
+                    >
+                      <ListItemIcon sx={{ minWidth: 28 }}>
+                        <LogoutIcon sx={{ fontSize: 18, color: 'error.main' }} />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primaryTypographyProps={{ 
+                          fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                          fontWeight: 500,
+                          color: 'error.main'
+                        }}
+                      >
+                        로그아웃
+                      </ListItemText>
+                    </MenuItem>
+                  </Box>
                 </Menu>
               </Box>
             ) : (
@@ -254,6 +369,35 @@ const Layout = ({ children, eventDetails }) => {
       <SuggestionDialog
         open={suggestionDialogOpen}
         onClose={() => setSuggestionDialogOpen(false)}
+      />
+
+      {/* Calendar Selection Dialog */}
+      <CalendarSelectionDialog
+        open={calendarSelectionDialog}
+        onClose={() => setCalendarSelectionDialog(false)}
+        onGoogleSelect={() => {
+          // Handle Google calendar selection
+          setCalendarSelectionDialog(false);
+        }}
+        onAppleSelect={() => {
+          setCalendarSelectionDialog(false);
+          setAppleDialogOpen(true);
+        }}
+        isGoogleUser={user?.providerData[0]?.providerId === 'google.com'}
+        showAlert={(message) => {
+          setSnackbarMessage(message);
+          setSnackbarSeverity('info');
+          setSnackbarOpen(true);
+        }}
+      />
+
+      {/* Apple Calendar Dialog */}
+      <AppleCalendarDialog
+        open={appleDialogOpen}
+        onClose={() => setAppleDialogOpen(false)}
+        onConnect={handleAppleCalendarConnect}
+        error={calendarImportError}
+        isLoading={false}
       />
       
       <Snackbar

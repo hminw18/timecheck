@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { Box, Typography, List, ListItem, ListItemText, IconButton, CircularProgress, Button, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Snackbar, Alert } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+import CloseIcon from '@mui/icons-material/Close';
+import ClearIcon from '@mui/icons-material/Clear';
 import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -118,7 +119,7 @@ const MyEventsPage = () => {
 
   return (
     <Layout>
-      <Box sx={{ maxWidth: '800px', mx: 'auto', mt: 4 }}>
+      <Box sx={{ maxWidth: '800px', mx: 'auto', mt: 4, px: { xs: 2, sm: 3 } }}>
         <Typography variant="h5" component="h1" sx={{ mt: 4, mb: 2, fontWeight: 'bold' }}>
           내 이벤트
         </Typography>
@@ -135,7 +136,7 @@ const MyEventsPage = () => {
                     e.stopPropagation();
                     handleDeleteClick(event.id, event.title);
                   }}>
-                    <DeleteIcon />
+                    <ClearIcon />
                   </IconButton>
                 }
                 sx={{ 
@@ -192,21 +193,69 @@ const MyEventsPage = () => {
       <Dialog
         open={deleteDialog.open}
         onClose={handleDeleteCancel}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            m: 2
+          }
+        }}
       >
-        <DialogTitle id="alert-dialog-title">
-          이벤트 삭제
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          pb: 1
+        }}>
+          <Typography variant="h6" fontWeight={600}>
+            이벤트 삭제
+          </Typography>
+          <IconButton
+            onClick={handleDeleteCancel}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { backgroundColor: 'action.hover' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-             "{deleteDialog.eventTitle}"를 삭제하시겠습니까?
-          </DialogContentText>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            정말로 삭제하시겠습니까?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            "{deleteDialog.eventTitle}" 이벤트와 모든 참여자 데이터가 영구적으로 삭제됩니다.
+          </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel}>취소</Button>
-          <Button onClick={handleDeleteConfirm} autoFocus color="error">
-            확인
+        <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
+          <Button 
+            onClick={handleDeleteCancel}
+            variant="outlined"
+            sx={{ 
+              borderRadius: 2,
+              minWidth: 80,
+              fontWeight: 500
+            }}
+          >
+            취소
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            variant="contained"
+            color="error"
+            autoFocus
+            sx={{ 
+              borderRadius: 2,
+              minWidth: 80,
+              fontWeight: 600,
+              boxShadow: 'none',
+              '&:hover': {
+                boxShadow: 'none'
+              }
+            }}
+          >
+            삭제
           </Button>
         </DialogActions>
       </Dialog>

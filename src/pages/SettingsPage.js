@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, Button, IconButton, Snackbar, List, ListItem, ListItemIcon, ListItemText, ListItemSecondaryAction, Chip, Divider, TextField, Alert } from '@mui/material';
+import { Typography, Box, Button, IconButton, Snackbar, List, ListItem, ListItemIcon, ListItemText, ListItemSecondaryAction, Chip, Divider, TextField, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
-import DeleteIcon from '@mui/icons-material/Delete';
+import ClearIcon from '@mui/icons-material/Clear';
 import AddIcon from '@mui/icons-material/Add';
 import FixedSchedule from '../components/FixedSchedule';
 import CalendarSelectionDialog from '../components/CalendarSelectionDialog';
@@ -13,14 +13,15 @@ import AppleCalendarDialog from '../components/AppleCalendarDialog';
 import { useEventData } from '../hooks/useEventData';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
-import { updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { updateProfile, deleteUser } from 'firebase/auth';
+import { doc, setDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useCalendarIntegration } from '../hooks/useCalendarIntegration';
 import { useGoogleOAuth } from '../contexts/GoogleOAuthContext';
+import { Navigate } from 'react-router-dom';
 
 const SettingsPage = () => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { fixedSchedule, handleSaveFixedSchedule } = useEventData(null, user);
   
   // Google OAuth state
@@ -58,6 +59,8 @@ const SettingsPage = () => {
   const [displayName, setDisplayName] = useState('');
   const [editedName, setEditedName] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [deleteAccountDialog, setDeleteAccountDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   
   
@@ -164,9 +167,47 @@ const SettingsPage = () => {
     setIsEditingName(false);
   };
 
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    
+    try {
+      const deletePromises = [];
+      
+      // 1. Delete only user document and fixed schedule (keep event data for other participants)
+      deletePromises.push(deleteDoc(doc(db, 'users', user.uid)));
+      deletePromises.push(deleteDoc(doc(db, 'fixedSchedules', user.uid)));
+      
+      // Execute deletions
+      await Promise.all(deletePromises);
+      
+      // 2. Delete Firebase Auth user (this will also sign out)
+      await deleteUser(user);
+      
+      setSnackbar({ open: true, message: '계정이 성공적으로 삭제되었습니다.', severity: 'success' });
+      
+    } catch (error) {
+      console.error('계정 삭제 오류:', error);
+      let errorMessage = '계정 삭제 중 오류가 발생했습니다.';
+      
+      if (error.code === 'auth/requires-recent-login') {
+        errorMessage = '보안을 위해 다시 로그인한 후 계정을 삭제해주세요.';
+      }
+      
+      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    } finally {
+      setIsDeleting(false);
+      setDeleteAccountDialog(false);
+    }
+  };
+
   const handleAppleConnect = () => {
     handleAppleCalendarConnect();
   };
+
+  // Redirect to home if not logged in (after hooks are called)
+  if (!isLoading && !user) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <Layout>
@@ -236,6 +277,7 @@ const SettingsPage = () => {
                 <Typography variant="body1">{user.email}</Typography>
               </Box>
             )}
+            
           </Box>
           
           <Divider sx={{ my: 3 }} />
@@ -297,7 +339,7 @@ const SettingsPage = () => {
                       disabled={googleConnecting}
                       sx={{ '&:hover': { color: 'error.main' } }}
                     >
-                      <DeleteIcon />
+                      <ClearIcon />
                     </IconButton>
                   ) : user?.providerData[0]?.providerId === 'google.com' ? (
                     <Button 
@@ -340,7 +382,7 @@ const SettingsPage = () => {
                       onClick={disconnectAppleCalendar}
                       sx={{ '&:hover': { color: 'error.main' } }}
                     >
-                      <DeleteIcon />
+                      <ClearIcon />
                     </IconButton>
                   ) : (
                     <Button 
@@ -360,7 +402,7 @@ const SettingsPage = () => {
           <Divider sx={{ my: 3 }} />
           
           {/* Fixed Schedule Section */}
-          <Box>
+          <Box sx={{ mb: 4 }}>
             <Box sx={{
               display: 'flex',
               flexDirection: { xs: 'column', sm: 'row' },
@@ -377,6 +419,29 @@ const SettingsPage = () => {
               fixedSchedule={fixedSchedule} 
               onSave={handleSaveFixedSchedule}
             />
+          </Box>
+          
+          <Divider sx={{ my: 3 }} />
+          
+          {/* Account Deletion Section */}
+          <Box>
+            <Typography variant="h6" sx={{ mb: 2 }}>계정 삭제</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              계정을 삭제하면 프로필 정보, 캘린더 연동 설정, 고정 일정 설정이 영구적으로 삭제됩니다.
+            </Typography>
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              onClick={() => setDeleteAccountDialog(true)}
+              sx={{
+                borderRadius: 2,
+                fontWeight: 500,
+                textTransform: 'none'
+              }}
+            >
+              계정 삭제
+            </Button>
           </Box>
         </Box>
       </Box>
@@ -420,6 +485,80 @@ const SettingsPage = () => {
         error={error}
         isLoading={isConnectingApple}
       />
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog
+        open={deleteAccountDialog}
+        onClose={() => setDeleteAccountDialog(false)}
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            m: 2
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          pb: 1
+        }}>
+          <Typography variant="h6" fontWeight={600}>
+            계정 삭제
+          </Typography>
+          <IconButton
+            onClick={() => setDeleteAccountDialog(false)}
+            disabled={isDeleting}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { backgroundColor: 'action.hover' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            정말로 계정을 삭제하시겠습니까?
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            프로필 정보, 캘린더 연동 설정, 고정 일정 설정이 영구적으로 삭제됩니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
+          <Button 
+            onClick={() => setDeleteAccountDialog(false)}
+            disabled={isDeleting}
+            variant="outlined"
+            sx={{ 
+              borderRadius: 2,
+              minWidth: 80,
+              fontWeight: 500
+            }}
+          >
+            취소
+          </Button>
+          <Button 
+            onClick={handleDeleteAccount}
+            disabled={isDeleting}
+            variant="contained"
+            color="error"
+            autoFocus
+            sx={{ 
+              borderRadius: 2,
+              minWidth: 80,
+              fontWeight: 600,
+              boxShadow: 'none',
+              '&:hover': {
+                boxShadow: 'none'
+              }
+            }}
+          >
+            {isDeleting ? '삭제 중...' : '삭제'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Layout>
   );
 };

@@ -301,11 +301,11 @@ const MySchedule = ({
             </ToggleButton>
           </ToggleButtonGroup>
         )}
-        {children && (
+        {(children || (!user && guestUser)) && (
           <Button 
             variant="outlined" 
             size="small" 
-            onClick={openCalendarDialog} 
+            onClick={user ? openCalendarDialog : onGoogleLogin} 
             sx={{ 
               fontSize: '0.75rem',
               py: 0.25,

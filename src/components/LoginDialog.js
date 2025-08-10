@@ -101,7 +101,7 @@ const LoginDialog = ({ open, onClose }) => {
           </Box>
 
           <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
-            로그인하면 더 많은 기능을 사용할 수 있습니다
+            로그인하면 캘린더를 연동해서 일정을 바로 불러올 수 있습니다
           </Typography>
         </Box>
       </DialogContent>

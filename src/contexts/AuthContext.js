@@ -20,6 +20,7 @@ const AuthProviderContent = ({ children }) => {
   const [appleCalendarError, setAppleCalendarError] = useState(null);
   const [appleCalendarUser, setAppleCalendarUser] = useState(null);
   const [authError, setAuthError] = useState(null);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -40,7 +41,9 @@ const AuthProviderContent = ({ children }) => {
       } else {
         // User logged in, check for stored calendar connections
         try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          const userDocRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
@@ -51,6 +54,17 @@ const AuthProviderContent = ({ children }) => {
               setAppleCalendarConnected(true);
               setAppleCalendarUser({appleId: userData.appleCalendar.appleId});
             }
+          } else {
+            // Create user document if it doesn't exist
+            await setDoc(userDocRef, {
+              displayName: currentUser.displayName || currentUser.email || 'User',
+              email: currentUser.email,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            
+            // Mark as first login
+            setIsFirstLogin(true);
           }
         } catch (error) {
           // Console statement removed for production
@@ -226,6 +240,10 @@ const AuthProviderContent = ({ children }) => {
     };
 
 
+    const clearFirstLogin = () => {
+      setIsFirstLogin(false);
+    };
+
     const value = {
       user,
       isLoading,
@@ -244,6 +262,8 @@ const AuthProviderContent = ({ children }) => {
       disconnectAppleCalendar,
       authError,
       setAuthError,
+      isFirstLogin,
+      clearFirstLogin,
     };
 
     // Always render children but pass loading state
