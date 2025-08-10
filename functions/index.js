@@ -238,7 +238,7 @@ exports.appleCalendarConnectForm = functions.region('asia-northeast3').https.onR
   // Set CORS headers
   const allowedOrigins = process.env.ALLOWED_ORIGINS 
     ? process.env.ALLOWED_ORIGINS.split(',') 
-    : ['http://localhost:3000', 'https://timecheck-40840.web.app', 'https://timecheck-40840.firebaseapp.com'];
+    : ['http://localhost:3000', 'https://timecheck-40840.web.app', 'https://timecheck-40840.firebaseapp.com', 'https://timecheck.app'];
   
   if (allowedOrigins.includes(origin)) {
     res.set('Access-Control-Allow-Origin', origin);
@@ -1465,6 +1465,12 @@ exports.getGoogleCalendarEvents = functions
         const beforeCount = events.length;
         console.log('[getGoogleCalendarEvents] Filtering for day-based events. Selected days:', selectedDays);
         events = events.filter(event => {
+          // For day-based events, only include recurring events
+          if (!event.isRecurring) {
+            console.log(`[getGoogleCalendarEvents] Non-recurring event excluded: ${event.title}`);
+            return false;
+          }
+          
           const eventDate = new Date(event.start);
           const dayIndex = eventDate.getDay();
           const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
