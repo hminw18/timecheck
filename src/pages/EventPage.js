@@ -652,7 +652,7 @@ const EventPage = ({
               size="small"
               startIcon={<ShareIcon />}
               onClick={() => {
-                const shareText = `${window.location.href}\n${eventDetails.title}\n\n캘린더 연동 기능을 사용해 TimeCheck에서 쉽고 빠르게 일정을 등록하세요!`;
+                const shareText = `${eventDetails.title}\n\n캘린더 연동 기능을 사용해 TimeCheck에서 쉽고 빠르게 일정을 등록하세요!\n\n${window.location.href}`;
                 const shareData = {
                   title: eventDetails.title,
                   text: shareText
