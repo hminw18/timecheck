@@ -444,6 +444,9 @@ exports.appleCalendarConnectForm = functions.region('asia-northeast3').https.onR
 });
 
 exports.appleCalendarConnect = functions.region('asia-northeast3').https.onCall(async (data, context) => {
+  // Clean up DAV cache on each request
+  cleanupDavClientCache();
+  
   try {
     const { appleId, appSpecificPassword } = data;
 
@@ -832,6 +835,7 @@ exports.appleCalendarGetEvents = functions.region('asia-northeast3').https.onCal
       .flatMap(result => result.value || []);
 
     // Events processing completed
+    console.log('[getGoogleCalendarEvents] Final events count:', events.length);
     
     return { events };
   } catch (error) {
@@ -898,54 +902,83 @@ exports.googleCalendarExchangeCode = functions.region('asia-northeast3').https.o
   }
 });
 
-// Helper function to get valid access token
+// Helper function to get valid access token with better error handling
 async function getValidAccessToken(userId) {
-  // Check memory cache first
-  const cached = accessTokenCache.get(userId);
-  if (cached && Date.now() < cached.expiry - 60000) { // 1 minute buffer
-    return cached.token;
-  }
-
-  // Get refresh token from Firestore
-  const credDoc = await db.collection('google_credentials').doc(userId).get();
-  if (!credDoc.exists || !credDoc.data().encryptedRefreshToken) {
-    throw new functions.https.HttpsError("failed-precondition", "No refresh token found. Please complete OAuth setup.");
-  }
-
-  const decryptedRefreshToken = await decrypt(credDoc.data().encryptedRefreshToken);
-  
-  // Get OAuth config
-  const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
-  const CLIENT_SECRET = await secretManager.getSecret('google-client-secret');
-  
-  const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET);
-  oauth2Client.setCredentials({ refresh_token: decryptedRefreshToken });
-  
   try {
-    const { credentials } = await oauth2Client.refreshAccessToken();
+    // Check memory cache first
+    const cached = accessTokenCache.get(userId);
+    if (cached && Date.now() < cached.expiry - 60000) { // 1 minute buffer
+      console.log('[getValidAccessToken] Using cached token for user:', userId);
+      return cached.token;
+    }
+
+    // Get refresh token from Firestore
+    const credDoc = await db.collection('google_credentials').doc(userId).get();
+    if (!credDoc.exists || !credDoc.data().encryptedRefreshToken) {
+      console.error('[getValidAccessToken] No refresh token found for user:', userId);
+      throw new functions.https.HttpsError("failed-precondition", "No refresh token found. Please complete OAuth setup.");
+    }
+
+    const decryptedRefreshToken = await decrypt(credDoc.data().encryptedRefreshToken);
     
-    // Cache the new access token
-    accessTokenCache.set(userId, {
-      token: credentials.access_token,
-      expiry: credentials.expiry_date || Date.now() + 3600 * 1000
-    });
+    // Get OAuth config
+    const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+    const CLIENT_SECRET = await secretManager.getSecret('google-client-secret');
+    
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      console.error('[getValidAccessToken] Missing OAuth configuration');
+      throw new functions.https.HttpsError("internal", "OAuth configuration error");
+    }
+    
+    const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET);
+    oauth2Client.setCredentials({ refresh_token: decryptedRefreshToken });
+    
+    try {
+      const { credentials } = await oauth2Client.refreshAccessToken();
+      
+      if (!credentials.access_token) {
+        console.error('[getValidAccessToken] No access token in refresh response');
+        throw new Error('Failed to obtain access token');
+      }
+      
+      // Cache the new access token
+      accessTokenCache.set(userId, {
+        token: credentials.access_token,
+        expiry: credentials.expiry_date || Date.now() + 3600 * 1000
+      });
+      
+      console.log('[getValidAccessToken] Successfully refreshed token for user:', userId);
     
     // Update last used timestamp
     await credDoc.ref.update({
       lastUsed: admin.firestore.FieldValue.serverTimestamp()
     });
-    return credentials.access_token;
-  } catch (error) {
-    if (error.message?.includes('invalid_grant')) {
-      // Delete invalid credentials
-      await credDoc.ref.delete();
-      accessTokenCache.delete(userId);
+      return credentials.access_token;
+    } catch (error) {
+      console.error('[getValidAccessToken] Token refresh error:', error.message);
+      
+      if (error.message?.includes('invalid_grant')) {
+        // Delete invalid credentials
+        await credDoc.ref.delete();
+        accessTokenCache.delete(userId);
+        throw new functions.https.HttpsError(
+          "unauthenticated", 
+          "Google Calendar 연동이 만료되었습니다. 다시 연동해주세요."
+        );
+      }
+      
+      // Generic token refresh error
       throw new functions.https.HttpsError(
-        "unauthenticated", 
-        "Google Calendar 연동이 만료되었습니다. 다시 연동해주세요."
+        "internal",
+        "Failed to refresh access token. Please try again."
       );
     }
-    throw error;
+  } catch (outerError) {
+    console.error('[getValidAccessToken] Unexpected error:', outerError);
+    throw new functions.https.HttpsError(
+      "internal",
+      "Authentication error. Please try reconnecting."
+    );
   }
 }
 
@@ -1327,21 +1360,35 @@ exports.getGoogleCalendarEvents = functions
     memory: '512MB'
   })
   .https.onCall(async (data, context) => {
-    // getGoogleCalendarEvents called
+    console.log('[getGoogleCalendarEvents] Function called with data:', JSON.stringify(data));
     
   try {
     // Verify user is authenticated
     if (!context.auth) {
+      console.log('[getGoogleCalendarEvents] No auth context');
       throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
     }
+    console.log('[getGoogleCalendarEvents] User ID:', context.auth.uid);
 
     const { startDate, endDate, eventType, startTime, endTime, selectedDays } = data;
     if (!startDate || !endDate) {
+      console.log('[getGoogleCalendarEvents] Missing dates');
       throw new functions.https.HttpsError("invalid-argument", "Start date and end date are required");
     }
     
+    console.log('[getGoogleCalendarEvents] Parameters:', {
+      startDate,
+      endDate,
+      eventType,
+      startTime,
+      endTime,
+      selectedDays
+    });
+    
     // Get valid access token using refresh token from Firestore
+    console.log('[getGoogleCalendarEvents] Getting access token for user:', context.auth.uid);
     const accessToken = await getValidAccessToken(context.auth.uid);
+    console.log('[getGoogleCalendarEvents] Access token obtained:', accessToken ? 'Yes' : 'No');
     
     // Use direct Google API client with access token
     const oauth2Client = new OAuth2Client();
@@ -1372,16 +1419,28 @@ exports.getGoogleCalendarEvents = functions
 
     // Fetch calendar events with exponential backoff
     try {
+      const timeMin = new Date(startDate).toISOString();
+      const timeMax = new Date(endDate).toISOString();
+      console.log('[getGoogleCalendarEvents] Fetching events from Google Calendar:', {
+        timeMin,
+        timeMax
+      });
+      
       const response = await withExponentialBackoff(async () => {
         return await calendar.events.list({
           calendarId: 'primary',
-          timeMin: new Date(startDate).toISOString(),
-          timeMax: new Date(endDate).toISOString(),
+          timeMin: timeMin,
+          timeMax: timeMax,
           singleEvents: true,
           orderBy: 'startTime',
           maxResults: 250,
           fields: 'items(id,summary,start,end,status,transparency,recurringEventId)'
         });
+      });
+      
+      console.log('[getGoogleCalendarEvents] Google Calendar API response:', {
+        itemsCount: response.data.items ? response.data.items.length : 0,
+        hasItems: !!response.data.items
       });
       
       // Process events
@@ -1396,25 +1455,33 @@ exports.getGoogleCalendarEvents = functions
         isRecurring: !!event.recurringEventId,
       }));
 
-      // Events fetched from Google Calendar
-      // Apply filtering parameters
+      console.log('[getGoogleCalendarEvents] Raw events count:', events.length);
+      if (events.length > 0) {
+        console.log('[getGoogleCalendarEvents] Sample event:', JSON.stringify(events[0]));
+      }
       
-      // Events ready for filtering
-
       // Filter events based on eventType and selectedDays on the backend
       if (eventType === 'day' && selectedDays && selectedDays.length > 0) {
         const beforeCount = events.length;
+        console.log('[getGoogleCalendarEvents] Filtering for day-based events. Selected days:', selectedDays);
         events = events.filter(event => {
           const eventDate = new Date(event.start);
           const dayIndex = eventDate.getDay();
-          return selectedDays.includes(dayIndex);
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const dayName = dayNames[dayIndex];
+          const isIncluded = selectedDays.includes(dayName);
+          if (!isIncluded && events.length < 10) { // Log only first few exclusions
+            console.log(`[getGoogleCalendarEvents] Event on ${dayName} (${event.start}) excluded`);
+          }
+          return isIncluded;
         });
-        // Day filter applied
+        console.log(`[getGoogleCalendarEvents] Day filter applied: ${beforeCount} -> ${events.length}`);
       }
 
       // Filter by time range if provided
       if (startTime && endTime && eventType !== 'day') {
         const beforeCount = events.length;
+        console.log('[getGoogleCalendarEvents] Filtering by time range:', { startTime, endTime });
         events = events.filter(event => {
           // For all-day events, include them by default
           if (event.isAllDay) {
