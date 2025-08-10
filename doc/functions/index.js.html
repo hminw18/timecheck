@@ -1,0 +1,4380 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>index.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="../doc-style.css" />
+  <script src="../doc-filelist.js"></script>
+  <script>
+    var relativeDir = "../";
+    var thisFile = "functions\\index.js";
+    var defaultSidebar = true;
+  </script>
+  <script src="../doc-script.js"></script>
+
+</head>
+<body>
+  <div id="sidebar_wrapper">
+    <div id="sidebar_switch">
+      <span class="tree">Files</span>
+      <span class="headings">Headings</span>
+    </div>
+    <div id="tree"></div>
+    <div id="headings">
+
+    </div>
+  </div>
+  <div id="sidebar-toggle"></div>
+  <div id="container">
+    <div class="background highlight"></div>
+<table cellpadding="0" cellspacing="0">
+  <tbody>
+    
+      <tr>
+        <td class="docs">
+          <h1>index.js</h1>
+        </td>
+        <td class="code highlight"></td>
+      </tr>
+    
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-1" id="section-1"></a>
+</div>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">const</span> functions = <span class="hljs-built_in">require</span>(<span class="hljs-string">"firebase-functions"</span>);
+<span class="hljs-keyword">const</span> admin = <span class="hljs-built_in">require</span>(<span class="hljs-string">"firebase-admin"</span>);
+<span class="hljs-keyword">const</span> ICAL = <span class="hljs-built_in">require</span>(<span class="hljs-string">"ical.js"</span>);
+<span class="hljs-keyword">const</span> crypto = <span class="hljs-built_in">require</span>(<span class="hljs-string">"crypto"</span>);
+<span class="hljs-keyword">const</span> cookieParser = <span class="hljs-built_in">require</span>(<span class="hljs-string">"cookie-parser"</span>);
+<span class="hljs-keyword">const</span> secureEncryption = <span class="hljs-built_in">require</span>(<span class="hljs-string">"./encryption"</span>);
+<span class="hljs-keyword">const</span> secretManager = <span class="hljs-built_in">require</span>(<span class="hljs-string">"./secretManager"</span>);
+<span class="hljs-keyword">const</span> {OAuth2Client} = <span class="hljs-built_in">require</span>(<span class="hljs-string">"google-auth-library"</span>);
+<span class="hljs-keyword">const</span> {google} = <span class="hljs-built_in">require</span>(<span class="hljs-string">"googleapis"</span>);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-2" id="section-2"></a>
+</div>
+<p>Check if tsdav is properly loaded</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">let</span> createDAVClient;
+<span class="hljs-keyword">let</span> davRequest;
+<span class="hljs-keyword">try</span> {
+  <span class="hljs-keyword">const</span> tsdav = <span class="hljs-built_in">require</span>(<span class="hljs-string">"tsdav"</span>);
+  createDAVClient = tsdav.createDAVClient;
+  davRequest = tsdav.davRequest;
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-3" id="section-3"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">} <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-4" id="section-4"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">}
+
+admin.initializeApp();
+<span class="hljs-keyword">const</span> db = admin.firestore();
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-5" id="section-5"></a>
+</div>
+<p>Set Firestore settings to avoid issues</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">db.settings({ <span class="hljs-attr">ignoreUndefinedProperties</span>: <span class="hljs-literal">true</span> });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-6" id="section-6"></a>
+</div>
+<p>In-memory access token cache</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">const</span> accessTokenCache = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(); <span class="hljs-comment">// uid -&gt; {token, expiry}</span>
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-7" id="section-7"></a>
+</div>
+<p>Apple Calendar DAV client cache (singleton pattern)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">const</span> davClientCache = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(); <span class="hljs-comment">// userId -&gt; {client, lastUsed, credentials}</span>
+<span class="hljs-keyword">const</span> DAV_CLIENT_TTL = <span class="hljs-number">30</span> * <span class="hljs-number">60</span> * <span class="hljs-number">1000</span>; <span class="hljs-comment">// 30 minutes</span>
+<span class="hljs-keyword">const</span> DAV_CLIENT_CLEANUP_INTERVAL = <span class="hljs-number">10</span> * <span class="hljs-number">60</span> * <span class="hljs-number">1000</span>; <span class="hljs-comment">// 10 minutes</span>
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-8" id="section-8"></a>
+</div>
+<p>Cleanup old DAV clients periodically</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">setInterval(<span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> {
+  <span class="hljs-keyword">const</span> now = <span class="hljs-built_in">Date</span>.now();
+  <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> [userId, cache] <span class="hljs-keyword">of</span> davClientCache.entries()) {
+    <span class="hljs-keyword">if</span> (now - cache.lastUsed &gt; DAV_CLIENT_TTL) {
+      davClientCache.delete(userId);
+    }
+  }
+}, DAV_CLIENT_CLEANUP_INTERVAL);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-9" id="section-9"></a>
+</div>
+<p>Rate limiting for authentication attempts</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">const</span> authAttempts = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Map</span>(); <span class="hljs-comment">// key -&gt; {count, firstAttempt, blocked}</span>
+<span class="hljs-keyword">const</span> RATE_LIMIT_WINDOW = <span class="hljs-number">5</span> * <span class="hljs-number">60</span> * <span class="hljs-number">1000</span>; <span class="hljs-comment">// 5 minutes</span>
+<span class="hljs-keyword">const</span> MAX_ATTEMPTS = <span class="hljs-number">30</span>;
+<span class="hljs-keyword">const</span> BLOCK_DURATION = <span class="hljs-number">60</span> * <span class="hljs-number">60</span> * <span class="hljs-number">1000</span>; <span class="hljs-comment">// 1 hour</span>
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-10" id="section-10"></a>
+</div>
+<p>Check rate limit</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">checkRateLimit</span>(<span class="hljs-params">key, action = <span class="hljs-string">'auth'</span></span>) </span>{
+  <span class="hljs-keyword">const</span> now = <span class="hljs-built_in">Date</span>.now();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-11" id="section-11"></a>
+</div>
+<p>Sanitize key to prevent injection</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> sanitizedKey = key.replace(<span class="hljs-regexp">/[^a-zA-Z0-9:.-]/g</span>, <span class="hljs-string">'_'</span>);
+  <span class="hljs-keyword">const</span> attemptKey = <span class="hljs-string">`<span class="hljs-subst">${action}</span>:<span class="hljs-subst">${sanitizedKey}</span>`</span>;
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-12" id="section-12"></a>
+</div>
+<p>Check Firestore for distributed rate limiting</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> rateLimitDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'rate_limits'</span>).doc(attemptKey).get();
+  
+  <span class="hljs-keyword">if</span> (rateLimitDoc.exists) {
+    <span class="hljs-keyword">const</span> data = rateLimitDoc.data();
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-13" id="section-13"></a>
+</div>
+<p>Check if blocked</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (data.blocked &amp;&amp; data.blockedUntil &gt; now) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">'resource-exhausted'</span>,
+        <span class="hljs-string">`Too many attempts. Please try again after <span class="hljs-subst">${<span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(data.blockedUntil).toLocaleString()}</span>`</span>
+      );
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-14" id="section-14"></a>
+</div>
+<p>Check attempt count within window</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (data.firstAttempt &gt; now - RATE_LIMIT_WINDOW) {
+      <span class="hljs-keyword">if</span> (data.count &gt;= MAX_ATTEMPTS) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-15" id="section-15"></a>
+</div>
+<p>Block the user</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">        <span class="hljs-keyword">await</span> rateLimitDoc.ref.update({
+          <span class="hljs-attr">blocked</span>: <span class="hljs-literal">true</span>,
+          <span class="hljs-attr">blockedUntil</span>: now + BLOCK_DURATION
+        });
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+          <span class="hljs-string">'resource-exhausted'</span>,
+          <span class="hljs-string">'Too many attempts. You have been temporarily blocked.'</span>
+        );
+      }
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-16" id="section-16"></a>
+</div>
+<p>Increment count</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">await</span> rateLimitDoc.ref.update({
+        <span class="hljs-attr">count</span>: admin.firestore.FieldValue.increment(<span class="hljs-number">1</span>),
+        <span class="hljs-attr">lastAttempt</span>: now
+      });
+    } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-17" id="section-17"></a>
+</div>
+<p>Reset window</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">await</span> rateLimitDoc.ref.set({
+        <span class="hljs-attr">count</span>: <span class="hljs-number">1</span>,
+        <span class="hljs-attr">firstAttempt</span>: now,
+        <span class="hljs-attr">lastAttempt</span>: now,
+        <span class="hljs-attr">blocked</span>: <span class="hljs-literal">false</span>
+      });
+    }
+  } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-18" id="section-18"></a>
+</div>
+<p>First attempt</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'rate_limits'</span>).doc(attemptKey).set({
+      <span class="hljs-attr">count</span>: <span class="hljs-number">1</span>,
+      <span class="hljs-attr">firstAttempt</span>: now,
+      <span class="hljs-attr">lastAttempt</span>: now,
+      <span class="hljs-attr">blocked</span>: <span class="hljs-literal">false</span>
+    });
+  }
+}
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-19" id="section-19"></a>
+</div>
+<p>Use secure encryption for all operations</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">encrypt</span>(<span class="hljs-params">text, context = <span class="hljs-string">''</span></span>) </span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> secureEncryption.encrypt(text, context);
+}
+
+<span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">decrypt</span>(<span class="hljs-params">encryptedData</span>) </span>{
+  <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> secureEncryption.decrypt(encryptedData);
+}
+
+<span class="hljs-keyword">const</span> APPLE_CALDAV_URL = <span class="hljs-string">"https://caldav.icloud.com"</span>;
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-20" id="section-20"></a>
+</div>
+<p>CSRF token storage using Firestore for production
+Collection: csrf_tokens
+Document ID: token value
+Fields: uid, expiry, createdAt</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-21" id="section-21"></a>
+</div>
+<p>Generate CSRF token for Apple Calendar connection</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.generateAppleCalendarToken = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">if</span> (!context.auth) {
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+  }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-22" id="section-22"></a>
+</div>
+<p>Generate a secure random token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> token = crypto.randomBytes(<span class="hljs-number">32</span>).toString(<span class="hljs-string">'hex'</span>);
+  <span class="hljs-keyword">const</span> cookieToken = crypto.randomBytes(<span class="hljs-number">32</span>).toString(<span class="hljs-string">'hex'</span>);
+  <span class="hljs-keyword">const</span> expiry = <span class="hljs-built_in">Date</span>.now() + <span class="hljs-number">30</span> * <span class="hljs-number">60</span> * <span class="hljs-number">1000</span>; <span class="hljs-comment">// 30 minutes</span>
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-23" id="section-23"></a>
+</div>
+<p>Create a hash of both tokens for server-side validation</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> tokenHash = crypto.createHash(<span class="hljs-string">'sha256'</span>)
+    .update(token + cookieToken)
+    .digest(<span class="hljs-string">'hex'</span>);
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-24" id="section-24"></a>
+</div>
+<p>Store token hash in Firestore with cookie token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'csrf_tokens'</span>).doc(tokenHash).set({
+    <span class="hljs-attr">uid</span>: context.auth.uid,
+    <span class="hljs-attr">expiry</span>: expiry,
+    <span class="hljs-attr">cookieToken</span>: cookieToken, <span class="hljs-comment">// Store for validation</span>
+    <span class="hljs-attr">createdAt</span>: admin.firestore.FieldValue.serverTimestamp()
+  });
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-25" id="section-25"></a>
+</div>
+<p>Clean up expired tokens (run periodically, not on every request)
+This could be moved to a scheduled function for better performance</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> now = <span class="hljs-built_in">Date</span>.now();
+  <span class="hljs-keyword">const</span> expiredTokensQuery = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'csrf_tokens'</span>)
+    .where(<span class="hljs-string">'expiry'</span>, <span class="hljs-string">'&lt;'</span>, now)
+    .limit(<span class="hljs-number">10</span>) <span class="hljs-comment">// Limit cleanup to avoid timeout</span>
+    .get();
+  
+  <span class="hljs-keyword">const</span> deleteBatch = db.batch();
+  expiredTokensQuery.forEach(<span class="hljs-function"><span class="hljs-params">doc</span> =&gt;</span> {
+    deleteBatch.delete(doc.ref);
+  });
+  <span class="hljs-keyword">await</span> deleteBatch.commit();
+  
+  <span class="hljs-keyword">return</span> {
+    token,
+    cookieToken, <span class="hljs-comment">// Return cookie token to be set by client</span>
+    <span class="hljs-attr">endpoint</span>: <span class="hljs-string">`https://asia-northeast3-timecheck-40840.cloudfunctions.net/appleCalendarConnectForm`</span>,
+    expiry
+  };
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-26" id="section-26"></a>
+</div>
+<p>Helper function to get real client IP</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">getRealClientIP</span>(<span class="hljs-params">req</span>) </span>{
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-27" id="section-27"></a>
+</div>
+<p>Firebase/Google Cloud Functions specific headers
+Firebase uses Fastly CDN which provides reliable headers</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> fastlyClientIP = req.headers[<span class="hljs-string">'fastly-client-ip'</span>];
+  <span class="hljs-keyword">if</span> (fastlyClientIP) {
+    <span class="hljs-keyword">return</span> fastlyClientIP;
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-28" id="section-28"></a>
+</div>
+<p>For Google Cloud Load Balancer, use the original IP
+X-Forwarded-For format: &quot;client, proxy1, proxy2&quot;</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> xForwardedFor = req.headers[<span class="hljs-string">'x-forwarded-for'</span>];
+  <span class="hljs-keyword">if</span> (xForwardedFor) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-29" id="section-29"></a>
+</div>
+<p>Take the first IP (original client)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> ips = xForwardedFor.split(<span class="hljs-string">','</span>).map(<span class="hljs-function"><span class="hljs-params">ip</span> =&gt;</span> ip.trim());
+    <span class="hljs-keyword">return</span> ips[<span class="hljs-number">0</span>];
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-30" id="section-30"></a>
+</div>
+<p>Fallback to direct connection</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">return</span> req.connection.remoteAddress || req.socket.remoteAddress;
+}
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-31" id="section-31"></a>
+</div>
+<p>Helper function to check if request is HTTPS</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">isSecureRequest</span>(<span class="hljs-params">req</span>) </span>{
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-32" id="section-32"></a>
+</div>
+<p>In Firebase Functions, check multiple indicators</p>
+<ol>
+<li>Firebase hosting always uses HTTPS in production</li>
+</ol>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">if</span> (req.headers[<span class="hljs-string">'x-appengine-https'</span>] === <span class="hljs-string">'on'</span>) {
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-33" id="section-33"></a>
+</div>
+<ol start="2">
+<li>Check original protocol (more reliable than x-forwarded-proto)</li>
+</ol>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">if</span> (req.headers[<span class="hljs-string">'x-forwarded-proto'</span>] === <span class="hljs-string">'https'</span>) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-34" id="section-34"></a>
+</div>
+<p>Only trust if it's from a known proxy</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> via = req.headers[<span class="hljs-string">'via'</span>];
+    <span class="hljs-keyword">if</span> (via &amp;&amp; (via.includes(<span class="hljs-string">'google'</span>) || via.includes(<span class="hljs-string">'Firebase'</span>))) {
+      <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+    }
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-35" id="section-35"></a>
+</div>
+<ol start="3">
+<li>Direct HTTPS connection</li>
+</ol>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">return</span> req.secure || req.protocol === <span class="hljs-string">'https'</span>;
+}
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-36" id="section-36"></a>
+</div>
+<p>Apple Calendar connection via direct HTTP POST (not callable)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.appleCalendarConnectForm = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onRequest(<span class="hljs-keyword">async</span> (req, res) =&gt; {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-37" id="section-37"></a>
+</div>
+<p>Parse cookies</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  cookieParser()(req, res, () =&gt; {});
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-38" id="section-38"></a>
+</div>
+<p>Enforce HTTPS (except for localhost development)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> origin = req.headers.origin || <span class="hljs-string">''</span>;
+  <span class="hljs-keyword">const</span> host = req.headers.host || <span class="hljs-string">''</span>;
+  <span class="hljs-keyword">const</span> isLocalhost = host.includes(<span class="hljs-string">'localhost'</span>) || host.includes(<span class="hljs-string">'127.0.0.1'</span>) || origin.includes(<span class="hljs-string">'localhost'</span>);
+  
+  <span class="hljs-keyword">if</span> (!isLocalhost &amp;&amp; !origin.startsWith(<span class="hljs-string">'https://'</span>)) {
+    res.status(<span class="hljs-number">403</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'HTTPS required for secure credential transmission'</span> });
+    <span class="hljs-keyword">return</span>;
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-39" id="section-39"></a>
+</div>
+<p>Validate request is coming from HTTPS using secure method</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">if</span> (!isLocalhost &amp;&amp; !isSecureRequest(req)) {
+    res.status(<span class="hljs-number">403</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'HTTPS required'</span> });
+    <span class="hljs-keyword">return</span>;
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-40" id="section-40"></a>
+</div>
+<p>Set CORS headers</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(<span class="hljs-string">','</span>) 
+    : [<span class="hljs-string">'http://localhost:3000'</span>, <span class="hljs-string">'https://timecheck-40840.web.app'</span>, <span class="hljs-string">'https://timecheck-40840.firebaseapp.com'</span>];
+  
+  <span class="hljs-keyword">if</span> (allowedOrigins.includes(origin)) {
+    res.set(<span class="hljs-string">'Access-Control-Allow-Origin'</span>, origin);
+  }
+  res.set(<span class="hljs-string">'Access-Control-Allow-Methods'</span>, <span class="hljs-string">'POST, OPTIONS'</span>);
+  res.set(<span class="hljs-string">'Access-Control-Allow-Headers'</span>, <span class="hljs-string">'Content-Type'</span>);
+  res.set(<span class="hljs-string">'Access-Control-Allow-Credentials'</span>, <span class="hljs-string">'true'</span>);
+  res.set(<span class="hljs-string">'Access-Control-Allow-Headers'</span>, <span class="hljs-string">'Content-Type, Cookie'</span>);
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-41" id="section-41"></a>
+</div>
+<p>Security headers</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  res.set(<span class="hljs-string">'X-Content-Type-Options'</span>, <span class="hljs-string">'nosniff'</span>);
+  res.set(<span class="hljs-string">'X-Frame-Options'</span>, <span class="hljs-string">'DENY'</span>);
+  res.set(<span class="hljs-string">'X-XSS-Protection'</span>, <span class="hljs-string">'1; mode=block'</span>);
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-42" id="section-42"></a>
+</div>
+<p>Enhanced HSTS with preload</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  res.set(<span class="hljs-string">'Strict-Transport-Security'</span>, <span class="hljs-string">'max-age=63072000; includeSubDomains; preload'</span>);
+  res.set(<span class="hljs-string">'Content-Security-Policy'</span>, <span class="hljs-string">"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests"</span>);
+  res.set(<span class="hljs-string">'Referrer-Policy'</span>, <span class="hljs-string">'strict-origin-when-cross-origin'</span>);
+  
+  <span class="hljs-keyword">if</span> (req.method === <span class="hljs-string">'OPTIONS'</span>) {
+    res.status(<span class="hljs-number">204</span>).send(<span class="hljs-string">''</span>);
+    <span class="hljs-keyword">return</span>;
+  }
+  
+  <span class="hljs-keyword">if</span> (req.method !== <span class="hljs-string">'POST'</span>) {
+    res.status(<span class="hljs-number">405</span>).send(<span class="hljs-string">'Method Not Allowed'</span>);
+    <span class="hljs-keyword">return</span>;
+  }
+  
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">const</span> { appleId, appSpecificPassword, csrfToken } = req.body;
+    <span class="hljs-keyword">const</span> csrfCookie = req.cookies ? req.cookies[<span class="hljs-string">'csrf-token'</span>] : <span class="hljs-literal">null</span>;
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-43" id="section-43"></a>
+</div>
+<p>Rate limiting by real client IP</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> clientIp = getRealClientIP(req);
+    <span class="hljs-keyword">try</span> {
+      <span class="hljs-keyword">await</span> checkRateLimit(clientIp, <span class="hljs-string">'apple-connect'</span>);
+    } <span class="hljs-keyword">catch</span> (error) {
+      <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+        res.status(<span class="hljs-number">429</span>).json({ <span class="hljs-attr">error</span>: error.message });
+        <span class="hljs-keyword">return</span>;
+      }
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-44" id="section-44"></a>
+</div>
+<p>Input validation</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> emailRegex = <span class="hljs-regexp">/^[^\s@]+@[^\s@]+\.[^\s@]+$/</span>;
+    <span class="hljs-keyword">const</span> appPasswordRegex = <span class="hljs-regexp">/^[a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4}$/i</span>;
+    
+    <span class="hljs-keyword">if</span> (!emailRegex.test(appleId)) {
+      res.status(<span class="hljs-number">400</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'잘못된 Apple ID 형식입니다. 올바른 이메일 주소를 입력해주세요.'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+    
+    <span class="hljs-keyword">if</span> (!appPasswordRegex.test(appSpecificPassword)) {
+      res.status(<span class="hljs-number">400</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'잘못된 앱 암호 형식입니다. (형식: xxxx-xxxx-xxxx-xxxx)'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-45" id="section-45"></a>
+</div>
+<p>Validate CSRF token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!csrfToken) {
+      res.status(<span class="hljs-number">403</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'보안 토큰이 누락되었습니다. 다시 시도해주세요.'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-46" id="section-46"></a>
+</div>
+<p>For cross-domain form submission, we'll validate just the token
+Look up token directly in Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> tokenQuery = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'csrf_tokens'</span>)
+      .where(<span class="hljs-string">'expiry'</span>, <span class="hljs-string">'&gt;'</span>, <span class="hljs-built_in">Date</span>.now())
+      .get();
+    
+    <span class="hljs-keyword">let</span> tokenDoc = <span class="hljs-literal">null</span>;
+    <span class="hljs-keyword">let</span> tokenData = <span class="hljs-literal">null</span>;
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-47" id="section-47"></a>
+</div>
+<p>Find matching token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> doc <span class="hljs-keyword">of</span> tokenQuery.docs) {
+      <span class="hljs-keyword">const</span> data = doc.data();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-48" id="section-48"></a>
+</div>
+<p>Check if this token matches (we stored the hash with both tokens)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">const</span> expectedHash = crypto.createHash(<span class="hljs-string">'sha256'</span>)
+        .update(csrfToken + data.cookieToken)
+        .digest(<span class="hljs-string">'hex'</span>);
+      
+      <span class="hljs-keyword">if</span> (doc.id === expectedHash) {
+        tokenDoc = doc;
+        tokenData = data;
+        <span class="hljs-keyword">break</span>;
+      }
+    }
+    
+    <span class="hljs-keyword">if</span> (!tokenDoc) {
+      res.status(<span class="hljs-number">403</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'보안 토큰이 만료되었습니다. 다시 시도해주세요.'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+    
+    <span class="hljs-keyword">if</span> (tokenData.expiry &lt; <span class="hljs-built_in">Date</span>.now()) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-49" id="section-49"></a>
+</div>
+<p>Delete expired token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">await</span> tokenDoc.ref.delete();
+      res.status(<span class="hljs-number">403</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'보안 토큰이 만료되었습니다. 다시 시도해주세요.'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-50" id="section-50"></a>
+</div>
+<p>Don't delete token here - only delete on success</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> userId = tokenData.uid;
+    
+    <span class="hljs-keyword">if</span> (!appleId || !appSpecificPassword) {
+      res.status(<span class="hljs-number">400</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'Apple ID와 앱 암호를 모두 입력해주세요.'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+
+    <span class="hljs-keyword">if</span> (!createDAVClient) {
+      res.status(<span class="hljs-number">500</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'Server configuration error'</span> });
+      <span class="hljs-keyword">return</span>;
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-51" id="section-51"></a>
+</div>
+<p>Test connection using singleton pattern</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">let</span> client;
+    <span class="hljs-keyword">const</span> tempCacheKey = <span class="hljs-string">`temp_<span class="hljs-subst">${appleId}</span>_<span class="hljs-subst">${<span class="hljs-built_in">Date</span>.now()}</span>`</span>;
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-52" id="section-52"></a>
+</div>
+<p>For form submission, create temporary client with shorter timeout</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> https = <span class="hljs-built_in">require</span>(<span class="hljs-string">'https'</span>);
+    <span class="hljs-keyword">const</span> agent = <span class="hljs-keyword">new</span> https.Agent({
+      <span class="hljs-attr">keepAlive</span>: <span class="hljs-literal">true</span>,
+      <span class="hljs-attr">keepAliveMsecs</span>: <span class="hljs-number">10000</span>,
+      <span class="hljs-attr">maxSockets</span>: <span class="hljs-number">5</span>,
+      <span class="hljs-attr">maxFreeSockets</span>: <span class="hljs-number">2</span>,
+      <span class="hljs-attr">timeout</span>: <span class="hljs-number">10000</span> <span class="hljs-comment">// 10 seconds timeout</span>
+    });
+    
+    <span class="hljs-keyword">try</span> {
+      client = <span class="hljs-keyword">await</span> createDAVClient({
+        <span class="hljs-attr">serverUrl</span>: APPLE_CALDAV_URL,
+        <span class="hljs-attr">credentials</span>: {
+          <span class="hljs-attr">username</span>: appleId,
+          <span class="hljs-attr">password</span>: appSpecificPassword,
+        },
+        <span class="hljs-attr">authMethod</span>: <span class="hljs-string">"Basic"</span>,
+        <span class="hljs-attr">defaultAccountType</span>: <span class="hljs-string">"caldav"</span>,
+        <span class="hljs-attr">timeout</span>: <span class="hljs-number">10000</span>, <span class="hljs-comment">// 10 seconds timeout</span>
+        <span class="hljs-attr">httpAgent</span>: agent,
+        <span class="hljs-attr">httpsAgent</span>: agent
+      });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-53" id="section-53"></a>
+</div>
+<p>Set a timeout for fetchCalendars</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">const</span> calendarsPromise = client.fetchCalendars();
+      <span class="hljs-keyword">const</span> timeoutPromise = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Promise</span>(<span class="hljs-function">(<span class="hljs-params">_, reject</span>) =&gt;</span> 
+        setTimeout(<span class="hljs-function"><span class="hljs-params">()</span> =&gt;</span> reject(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'401'</span>)), <span class="hljs-number">10000</span>)
+      );
+      
+      <span class="hljs-keyword">const</span> calendars = <span class="hljs-keyword">await</span> <span class="hljs-built_in">Promise</span>.race([calendarsPromise, timeoutPromise]);
+    } <span class="hljs-keyword">catch</span> (davError) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-54" id="section-54"></a>
+</div>
+<p>If authentication fails, it will throw immediately</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">if</span> (davError.message &amp;&amp; (davError.message.includes(<span class="hljs-string">'401'</span>) || davError.message.includes(<span class="hljs-string">'Unauthorized'</span>))) {
+        res.status(<span class="hljs-number">401</span>).json({ <span class="hljs-attr">error</span>: <span class="hljs-string">'잘못된 Apple ID 또는 앱 암호입니다. 다시 확인해주세요.'</span> });
+        <span class="hljs-keyword">return</span>;
+      }
+      <span class="hljs-keyword">throw</span> davError;
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-55" id="section-55"></a>
+</div>
+<p>Generate a unique connection ID</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> connectionId = <span class="hljs-string">`apple_<span class="hljs-subst">${userId}</span>_<span class="hljs-subst">${<span class="hljs-built_in">Date</span>.now()}</span>`</span>;
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-56" id="section-56"></a>
+</div>
+<p>Store encrypted credentials in Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> encryptedPassword = <span class="hljs-keyword">await</span> encrypt(appSpecificPassword, <span class="hljs-string">`apple:<span class="hljs-subst">${userId}</span>`</span>);
+    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'apple_credentials'</span>).doc(userId).set({
+      connectionId,
+      appleId,
+      encryptedPassword,
+      <span class="hljs-attr">createdAt</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(),
+      <span class="hljs-attr">lastUsed</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>()
+    });
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-57" id="section-57"></a>
+</div>
+<p>Also update user document for frontend to detect connection</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'users'</span>).doc(userId).set({
+      <span class="hljs-attr">appleCalendar</span>: {
+        appleId,
+        <span class="hljs-attr">connected</span>: <span class="hljs-literal">true</span>,
+        <span class="hljs-attr">connectedAt</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>()
+      }
+    }, { <span class="hljs-attr">merge</span>: <span class="hljs-literal">true</span> });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-58" id="section-58"></a>
+</div>
+<p>Delete the CSRF token only on success</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (tokenDoc) {
+      <span class="hljs-keyword">await</span> tokenDoc.ref.delete();
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-59" id="section-59"></a>
+</div>
+<p>Set security headers</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    res.set(<span class="hljs-string">'X-Content-Type-Options'</span>, <span class="hljs-string">'nosniff'</span>);
+    res.set(<span class="hljs-string">'X-Frame-Options'</span>, <span class="hljs-string">'DENY'</span>);
+    res.set(<span class="hljs-string">'X-XSS-Protection'</span>, <span class="hljs-string">'1; mode=block'</span>);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-60" id="section-60"></a>
+</div>
+<p>Return success JSON instead of redirect for CORS compatibility</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    res.status(<span class="hljs-number">200</span>).json({ <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>, <span class="hljs-attr">message</span>: <span class="hljs-string">'Apple Calendar 연동이 완료되었습니다.'</span> });
+    
+  } <span class="hljs-keyword">catch</span> (error) {
+    
+    <span class="hljs-keyword">let</span> errorMessage = <span class="hljs-string">'Apple Calendar 연결에 실패했습니다. 다시 시도해주세요.'</span>;
+    
+    <span class="hljs-keyword">if</span> (error.message &amp;&amp; error.message.includes(<span class="hljs-string">"401"</span>)) {
+      errorMessage = <span class="hljs-string">'잘못된 Apple ID 또는 앱 암호입니다. 다시 확인해주세요.'</span>;
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-61" id="section-61"></a>
+</div>
+<p>Return JSON error for authentication errors</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    res.status(<span class="hljs-number">401</span>).json({ <span class="hljs-attr">error</span>: errorMessage });
+  }
+});
+
+exports.appleCalendarConnect = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-62" id="section-62"></a>
+</div>
+<p>Clean up DAV cache on each request</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  cleanupDavClientCache();
+  
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">const</span> { appleId, appSpecificPassword } = data;
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-63" id="section-63"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-64" id="section-64"></a>
+</div>
+<p>Rate limiting by user ID</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> checkRateLimit(context.auth.uid, <span class="hljs-string">'apple-connect'</span>);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-65" id="section-65"></a>
+</div>
+<p>Input validation</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> emailRegex = <span class="hljs-regexp">/^[^\s@]+@[^\s@]+\.[^\s@]+$/</span>;
+    <span class="hljs-keyword">const</span> appPasswordRegex = <span class="hljs-regexp">/^[a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4}$/i</span>;
+    
+    <span class="hljs-keyword">if</span> (!appleId || !appSpecificPassword) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"invalid-argument"</span>,
+        <span class="hljs-string">"Apple ID and app-specific password are required"</span>
+      );
+    }
+    
+    <span class="hljs-keyword">if</span> (!emailRegex.test(appleId)) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"invalid-argument"</span>,
+        <span class="hljs-string">"Invalid Apple ID format. Please enter a valid email address."</span>
+      );
+    }
+    
+    <span class="hljs-keyword">if</span> (!appPasswordRegex.test(appSpecificPassword)) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"invalid-argument"</span>,
+        <span class="hljs-string">"Invalid app-specific password format. Expected format: xxxx-xxxx-xxxx-xxxx"</span>
+      );
+    }
+
+    <span class="hljs-keyword">if</span> (!createDAVClient) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"internal"</span>,
+        <span class="hljs-string">"tsdav library not loaded properly"</span>
+      );
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-66" id="section-66"></a>
+</div>
+<p>Use singleton pattern for connection test</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">let</span> client;
+    <span class="hljs-keyword">const</span> cacheKey = context.auth.uid;
+    <span class="hljs-keyword">const</span> cachedClient = davClientCache.get(cacheKey);
+    <span class="hljs-keyword">const</span> passwordHash = crypto.createHash(<span class="hljs-string">'sha256'</span>).update(appSpecificPassword).digest(<span class="hljs-string">'hex'</span>);
+    
+    <span class="hljs-keyword">if</span> (cachedClient &amp;&amp; 
+        cachedClient.credentials.appleId === appleId &amp;&amp;
+        cachedClient.credentials.passwordHash === passwordHash) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-67" id="section-67"></a>
+</div>
+<p>Reuse existing client for test</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      client = cachedClient.client;
+      cachedClient.lastUsed = <span class="hljs-built_in">Date</span>.now();
+    } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-68" id="section-68"></a>
+</div>
+<p>Create new client with keep-alive for test</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">const</span> https = <span class="hljs-built_in">require</span>(<span class="hljs-string">'https'</span>);
+      <span class="hljs-keyword">const</span> agent = <span class="hljs-keyword">new</span> https.Agent({
+        <span class="hljs-attr">keepAlive</span>: <span class="hljs-literal">true</span>,
+        <span class="hljs-attr">keepAliveMsecs</span>: <span class="hljs-number">30000</span>,
+        <span class="hljs-attr">maxSockets</span>: <span class="hljs-number">5</span>,
+        <span class="hljs-attr">maxFreeSockets</span>: <span class="hljs-number">2</span>,
+        <span class="hljs-attr">timeout</span>: <span class="hljs-number">60000</span>
+      });
+      
+      client = <span class="hljs-keyword">await</span> createDAVClient({
+        <span class="hljs-attr">serverUrl</span>: APPLE_CALDAV_URL,
+        <span class="hljs-attr">credentials</span>: {
+          <span class="hljs-attr">username</span>: appleId,
+          <span class="hljs-attr">password</span>: appSpecificPassword,
+        },
+        <span class="hljs-attr">authMethod</span>: <span class="hljs-string">"Basic"</span>,
+        <span class="hljs-attr">defaultAccountType</span>: <span class="hljs-string">"caldav"</span>,
+        <span class="hljs-attr">timeout</span>: <span class="hljs-number">30000</span>,
+        <span class="hljs-attr">httpAgent</span>: agent,
+        <span class="hljs-attr">httpsAgent</span>: agent
+      });
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-69" id="section-69"></a>
+</div>
+<p>Cache the client</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      davClientCache.set(cacheKey, {
+        client,
+        <span class="hljs-attr">lastUsed</span>: <span class="hljs-built_in">Date</span>.now(),
+        <span class="hljs-attr">credentials</span>: {
+          <span class="hljs-attr">appleId</span>: appleId,
+          <span class="hljs-attr">passwordHash</span>: passwordHash
+        }
+      });
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-70" id="section-70"></a>
+</div>
+<p>Test connection by fetching calendars</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> calendars = <span class="hljs-keyword">await</span> client.fetchCalendars();
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-71" id="section-71"></a>
+</div>
+<p>Generate a unique connection ID</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> connectionId = <span class="hljs-string">`apple_<span class="hljs-subst">${context.auth.uid}</span>_<span class="hljs-subst">${<span class="hljs-built_in">Date</span>.now()}</span>`</span>;
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-72" id="section-72"></a>
+</div>
+<p>Store encrypted credentials in Firestore with user context</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> encryptedPassword = <span class="hljs-keyword">await</span> encrypt(appSpecificPassword, <span class="hljs-string">`apple:<span class="hljs-subst">${context.auth.uid}</span>`</span>);
+    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'apple_credentials'</span>).doc(context.auth.uid).set({
+      connectionId,
+      appleId,
+      encryptedPassword,
+      <span class="hljs-attr">createdAt</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(),
+      <span class="hljs-attr">lastUsed</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>()
+    });
+
+    <span class="hljs-keyword">return</span> {
+      <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>,
+      connectionId,
+      <span class="hljs-attr">calendarsCount</span>: calendars.length,
+    };
+  } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-73" id="section-73"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-74" id="section-74"></a>
+</div>
+<p>Check for specific error types but return generic messages</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (error.message &amp;&amp; error.message.includes(<span class="hljs-string">"401"</span>)) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"unauthenticated"</span>,
+        <span class="hljs-string">"Invalid credentials"</span>
+      );
+    }
+    
+    <span class="hljs-keyword">if</span> (error.message &amp;&amp; error.message.includes(<span class="hljs-string">"homeUrl"</span>)) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"internal"</span>,
+        <span class="hljs-string">"Connection failed. Please check your credentials and try again."</span>
+      );
+    }
+
+    <span class="hljs-keyword">if</span> (error.message &amp;&amp; (error.message.includes(<span class="hljs-string">"timeout"</span>) || error.message.includes(<span class="hljs-string">"network"</span>))) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"internal"</span>,
+        <span class="hljs-string">"Network error. Please try again."</span>
+      );
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-75" id="section-75"></a>
+</div>
+<p>Generic error message</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+      <span class="hljs-string">"internal"</span>,
+      <span class="hljs-string">"Connection failed. Please try again."</span>
+    );
+  }
+});
+
+exports.appleCalendarGetEvents = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">const</span> startTime = <span class="hljs-built_in">Date</span>.now();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-76" id="section-76"></a>
+</div>
+<p>Function called</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">const</span> { startDate, endDate } = data;
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-77" id="section-77"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+    <span class="hljs-keyword">if</span> (!startDate || !endDate) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"invalid-argument"</span>,
+        <span class="hljs-string">"Start and end dates are required"</span>
+      );
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-78" id="section-78"></a>
+</div>
+<p>Retrieve encrypted credentials from Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> firestoreStart = <span class="hljs-built_in">Date</span>.now();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-79" id="section-79"></a>
+</div>
+<p>Fetching Apple credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> credDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'apple_credentials'</span>).doc(context.auth.uid).get();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-80" id="section-80"></a>
+</div>
+<p>Credentials lookup completed</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+    <span class="hljs-keyword">if</span> (!credDoc.exists) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"not-found"</span>,
+        <span class="hljs-string">"Apple Calendar credentials not found. Please connect first."</span>
+      );
+    }
+
+    <span class="hljs-keyword">const</span> credData = credDoc.data();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-81" id="section-81"></a>
+</div>
+<p>Decrypt password - handles both old and new formats</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> decryptStart = <span class="hljs-built_in">Date</span>.now();
+    <span class="hljs-keyword">const</span> decryptedPassword = <span class="hljs-keyword">await</span> decrypt(credData.encryptedPassword);
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-82" id="section-82"></a>
+</div>
+<p>Password decrypted</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-83" id="section-83"></a>
+</div>
+<p>Update last used timestamp</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> credDoc.ref.update({
+      <span class="hljs-attr">lastUsed</span>: <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>()
+    });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-84" id="section-84"></a>
+</div>
+<p>Check DAV client cache first</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">let</span> client;
+    <span class="hljs-keyword">const</span> cacheKey = context.auth.uid;
+    <span class="hljs-keyword">const</span> cachedClient = davClientCache.get(cacheKey);
+    
+    <span class="hljs-keyword">if</span> (cachedClient &amp;&amp; 
+        cachedClient.credentials.appleId === credData.appleId &amp;&amp;
+        cachedClient.credentials.passwordHash === crypto.createHash(<span class="hljs-string">'sha256'</span>).update(decryptedPassword).digest(<span class="hljs-string">'hex'</span>)) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-85" id="section-85"></a>
+</div>
+<p>Reuse existing client</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      client = cachedClient.client;
+      cachedClient.lastUsed = <span class="hljs-built_in">Date</span>.now();
+    } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-86" id="section-86"></a>
+</div>
+<p>Create new client with keep-alive</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">const</span> clientStartTime = <span class="hljs-built_in">Date</span>.now();
+      <span class="hljs-keyword">const</span> https = <span class="hljs-built_in">require</span>(<span class="hljs-string">'https'</span>);
+      <span class="hljs-keyword">const</span> agent = <span class="hljs-keyword">new</span> https.Agent({
+        <span class="hljs-attr">keepAlive</span>: <span class="hljs-literal">true</span>,
+        <span class="hljs-attr">keepAliveMsecs</span>: <span class="hljs-number">30000</span>,
+        <span class="hljs-attr">maxSockets</span>: <span class="hljs-number">5</span>,
+        <span class="hljs-attr">maxFreeSockets</span>: <span class="hljs-number">2</span>,
+        <span class="hljs-attr">timeout</span>: <span class="hljs-number">60000</span>
+      });
+      
+      client = <span class="hljs-keyword">await</span> createDAVClient({
+        <span class="hljs-attr">serverUrl</span>: APPLE_CALDAV_URL,
+        <span class="hljs-attr">credentials</span>: {
+          <span class="hljs-attr">username</span>: credData.appleId,
+          <span class="hljs-attr">password</span>: decryptedPassword,
+        },
+        <span class="hljs-attr">authMethod</span>: <span class="hljs-string">"Basic"</span>,
+        <span class="hljs-attr">defaultAccountType</span>: <span class="hljs-string">"caldav"</span>,
+        <span class="hljs-attr">httpAgent</span>: agent,
+        <span class="hljs-attr">httpsAgent</span>: agent
+      });
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-87" id="section-87"></a>
+</div>
+<p>Cache the client</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      davClientCache.set(cacheKey, {
+        client,
+        <span class="hljs-attr">lastUsed</span>: <span class="hljs-built_in">Date</span>.now(),
+        <span class="hljs-attr">credentials</span>: {
+          <span class="hljs-attr">appleId</span>: credData.appleId,
+          <span class="hljs-attr">passwordHash</span>: crypto.createHash(<span class="hljs-string">'sha256'</span>).update(decryptedPassword).digest(<span class="hljs-string">'hex'</span>)
+        }
+      });
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-88" id="section-88"></a>
+</div>
+<p>DAV client created in ${Date.now() - clientStartTime}ms</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    }
+
+    <span class="hljs-keyword">const</span> fetchCalendarsStart = <span class="hljs-built_in">Date</span>.now();
+    <span class="hljs-keyword">const</span> calendars = <span class="hljs-keyword">await</span> client.fetchCalendars();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-89" id="section-89"></a>
+</div>
+<p>Calendars fetched</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-90" id="section-90"></a>
+</div>
+<p>Fetch events from all calendars in parallel using fetchCalendarObjects</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> calendarPromises = calendars.map(<span class="hljs-keyword">async</span> (calendar) =&gt; {
+      <span class="hljs-keyword">const</span> calendarStartTime = <span class="hljs-built_in">Date</span>.now();
+      <span class="hljs-keyword">try</span> {
+        <span class="hljs-keyword">const</span> fetchStart = <span class="hljs-built_in">Date</span>.now();
+        <span class="hljs-keyword">const</span> calendarEvents = <span class="hljs-keyword">await</span> client.fetchCalendarObjects({
+          <span class="hljs-attr">calendar</span>: calendar,
+          <span class="hljs-attr">timeRange</span>: {
+            <span class="hljs-attr">start</span>: startDate,
+            <span class="hljs-attr">end</span>: endDate,
+          },
+        });
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-91" id="section-91"></a>
+</div>
+<p>Calendar objects fetched</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">
+        <span class="hljs-keyword">const</span> parsedEvents = [];
+        <span class="hljs-keyword">const</span> parseStart = <span class="hljs-built_in">Date</span>.now();
+        
+        <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> obj <span class="hljs-keyword">of</span> calendarEvents) {
+          <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-92" id="section-92"></a>
+</div>
+<p>Parse the raw iCalendar data</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            <span class="hljs-keyword">if</span> (obj.data &amp;&amp; <span class="hljs-keyword">typeof</span> obj.data === <span class="hljs-string">'string'</span>) {
+              <span class="hljs-keyword">const</span> jcalData = ICAL.parse(obj.data);
+              <span class="hljs-keyword">const</span> comp = <span class="hljs-keyword">new</span> ICAL.Component(jcalData);
+              
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-93" id="section-93"></a>
+</div>
+<p>Get both events and todos</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">              <span class="hljs-keyword">const</span> vevents = comp.getAllSubcomponents(<span class="hljs-string">'vevent'</span>);
+              <span class="hljs-keyword">const</span> vtodos = comp.getAllSubcomponents(<span class="hljs-string">'vtodo'</span>);
+              
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-94" id="section-94"></a>
+</div>
+<p>Process regular events</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">              <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> vevent <span class="hljs-keyword">of</span> vevents) {
+                <span class="hljs-keyword">const</span> event = <span class="hljs-keyword">new</span> ICAL.Event(vevent);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-95" id="section-95"></a>
+</div>
+<p>Check if event falls within our time range</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                <span class="hljs-keyword">const</span> eventStart = event.startDate.toJSDate();
+                <span class="hljs-keyword">const</span> eventEnd = event.endDate.toJSDate();
+                
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-96" id="section-96"></a>
+</div>
+<p>For recurring events, we need to check occurrences</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                <span class="hljs-keyword">if</span> (event.isRecurring()) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-97" id="section-97"></a>
+</div>
+<p>Get the recurrence rule</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                  <span class="hljs-keyword">const</span> rruleProp = vevent.getFirstProperty(<span class="hljs-string">'rrule'</span>);
+                  <span class="hljs-keyword">const</span> rruleValue = rruleProp ? rruleProp.getFirstValue() : <span class="hljs-literal">null</span>;
+                  <span class="hljs-keyword">const</span> rruleString = rruleValue ? rruleValue.toString() : <span class="hljs-literal">null</span>;
+                  
+                  <span class="hljs-keyword">const</span> iterator = event.iterator();
+                  <span class="hljs-keyword">let</span> next;
+                  <span class="hljs-keyword">while</span> ((next = iterator.next())) {
+                    <span class="hljs-keyword">const</span> occurrenceStart = next.toJSDate();
+                    <span class="hljs-keyword">if</span> (occurrenceStart &gt; <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(endDate)) <span class="hljs-keyword">break</span>;
+                    <span class="hljs-keyword">if</span> (occurrenceStart &gt;= <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(startDate)) {
+                      <span class="hljs-keyword">const</span> duration = event.duration;
+                      <span class="hljs-keyword">const</span> occurrenceEnd = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(occurrenceStart.getTime() + duration.toSeconds() * <span class="hljs-number">1000</span>);
+                      
+                      parsedEvents.push({
+                        <span class="hljs-attr">id</span>: event.uid + <span class="hljs-string">'_'</span> + occurrenceStart.toISOString(),
+                        <span class="hljs-attr">summary</span>: event.summary || <span class="hljs-string">"Untitled Event"</span>,
+                        <span class="hljs-attr">start</span>: occurrenceStart.toISOString(),
+                        <span class="hljs-attr">end</span>: occurrenceEnd.toISOString(),
+                        <span class="hljs-attr">isAllDay</span>: event.startDate.isDate,
+                        <span class="hljs-attr">status</span>: vevent.getFirstPropertyValue(<span class="hljs-string">'status'</span>) || <span class="hljs-string">'CONFIRMED'</span>,
+                        <span class="hljs-attr">transparency</span>: vevent.getFirstPropertyValue(<span class="hljs-string">'transp'</span>) || <span class="hljs-string">'OPAQUE'</span>,
+                        <span class="hljs-attr">isRecurring</span>: <span class="hljs-literal">true</span>,
+                        <span class="hljs-attr">recurrenceRule</span>: rruleString
+                      });
+                    }
+                  }
+                } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-98" id="section-98"></a>
+</div>
+<p>Non-recurring event</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                  <span class="hljs-keyword">if</span> (eventStart &lt;= <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(endDate) &amp;&amp; eventEnd &gt;= <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(startDate)) {
+                    parsedEvents.push({
+                      <span class="hljs-attr">id</span>: event.uid,
+                      <span class="hljs-attr">summary</span>: event.summary || <span class="hljs-string">"Untitled Event"</span>,
+                      <span class="hljs-attr">start</span>: eventStart.toISOString(),
+                      <span class="hljs-attr">end</span>: eventEnd.toISOString(),
+                      <span class="hljs-attr">isAllDay</span>: event.startDate.isDate,
+                      <span class="hljs-attr">status</span>: vevent.getFirstPropertyValue(<span class="hljs-string">'status'</span>) || <span class="hljs-string">'CONFIRMED'</span>,
+                      <span class="hljs-attr">transparency</span>: vevent.getFirstPropertyValue(<span class="hljs-string">'transp'</span>) || <span class="hljs-string">'OPAQUE'</span>,
+                      <span class="hljs-attr">isRecurring</span>: <span class="hljs-literal">false</span>,
+                      <span class="hljs-attr">recurrenceRule</span>: <span class="hljs-literal">null</span>
+                    });
+                  }
+                }
+              }
+              
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-99" id="section-99"></a>
+</div>
+<p>Process todos (reminders)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">              <span class="hljs-keyword">for</span> (<span class="hljs-keyword">const</span> vtodo <span class="hljs-keyword">of</span> vtodos) {
+                <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-100" id="section-100"></a>
+</div>
+<p>Get todo properties</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                  <span class="hljs-keyword">const</span> uid = vtodo.getFirstPropertyValue(<span class="hljs-string">'uid'</span>);
+                  <span class="hljs-keyword">const</span> summary = vtodo.getFirstPropertyValue(<span class="hljs-string">'summary'</span>) || <span class="hljs-string">'Untitled Reminder'</span>;
+                  <span class="hljs-keyword">const</span> dueProp = vtodo.getFirstProperty(<span class="hljs-string">'due'</span>);
+                  <span class="hljs-keyword">const</span> completedProp = vtodo.getFirstProperty(<span class="hljs-string">'completed'</span>);
+                  <span class="hljs-keyword">const</span> status = vtodo.getFirstPropertyValue(<span class="hljs-string">'status'</span>);
+                  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-101" id="section-101"></a>
+</div>
+<p>Skip completed todos</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                  <span class="hljs-keyword">if</span> (status === <span class="hljs-string">'COMPLETED'</span> || completedProp) {
+                    <span class="hljs-keyword">continue</span>;
+                  }
+                  
+                  <span class="hljs-keyword">if</span> (dueProp) {
+                    <span class="hljs-keyword">const</span> dueTime = dueProp.getFirstValue();
+                    <span class="hljs-keyword">const</span> dueDate = dueTime.toJSDate();
+                    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-102" id="section-102"></a>
+</div>
+<p>Check if todo falls within our time range</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                    <span class="hljs-keyword">if</span> (dueDate &gt;= <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(startDate) &amp;&amp; dueDate &lt;= <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(endDate)) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-103" id="section-103"></a>
+</div>
+<p>Create a 1-hour block for the reminder</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                      <span class="hljs-keyword">const</span> reminderStart = dueDate;
+                      <span class="hljs-keyword">const</span> reminderEnd = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(dueDate.getTime() + <span class="hljs-number">60</span> * <span class="hljs-number">60</span> * <span class="hljs-number">1000</span>); <span class="hljs-comment">// 1 hour later</span>
+                      
+                      parsedEvents.push({
+                        <span class="hljs-attr">id</span>: uid,
+                        <span class="hljs-attr">summary</span>: <span class="hljs-string">`📌 <span class="hljs-subst">${summary}</span>`</span>,
+                        <span class="hljs-attr">start</span>: reminderStart.toISOString(),
+                        <span class="hljs-attr">end</span>: reminderEnd.toISOString(),
+                        <span class="hljs-attr">isAllDay</span>: dueTime.isDate,
+                        <span class="hljs-attr">status</span>: status || <span class="hljs-string">'NEEDS-ACTION'</span>,
+                        <span class="hljs-attr">transparency</span>: <span class="hljs-string">'TRANSPARENT'</span>,
+                        <span class="hljs-attr">isRecurring</span>: <span class="hljs-literal">false</span>,
+                        <span class="hljs-attr">recurrenceRule</span>: <span class="hljs-literal">null</span>,
+                        <span class="hljs-attr">isTodo</span>: <span class="hljs-literal">true</span>
+                      });
+                    }
+                  }
+                } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-104" id="section-104"></a>
+</div>
+<p>Error parsing todo</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">                }
+              }
+            }
+          } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-105" id="section-105"></a>
+</div>
+<p>Error parsing event</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          }
+        }
+        
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-106" id="section-106"></a>
+</div>
+<p>Events parsed</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">        <span class="hljs-keyword">return</span> parsedEvents;
+      } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-107" id="section-107"></a>
+</div>
+<p>Error fetching calendar</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">        <span class="hljs-keyword">return</span> [];
+      }
+    });
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-108" id="section-108"></a>
+</div>
+<p>Use Promise.allSettled for better error handling and parallel processing</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> allCalendarResults = <span class="hljs-keyword">await</span> <span class="hljs-built_in">Promise</span>.allSettled(calendarPromises);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-109" id="section-109"></a>
+</div>
+<p>Process results and collect successful calendar events</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> events = allCalendarResults
+      .filter(<span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> result.status === <span class="hljs-string">'fulfilled'</span>)
+      .flatMap(<span class="hljs-function"><span class="hljs-params">result</span> =&gt;</span> result.value || []);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-110" id="section-110"></a>
+</div>
+<p>Events processing completed</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Final events count:'</span>, events.length);
+    
+    <span class="hljs-keyword">return</span> { events };
+  } <span class="hljs-keyword">catch</span> (error) {
+    
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+      <span class="hljs-string">"internal"</span>,
+      error.message || <span class="hljs-string">"Failed to fetch calendar events"</span>
+    );
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-111" id="section-111"></a>
+</div>
+<p>Exchange authorization code for tokens</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarExchangeCode = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-112" id="section-112"></a>
+</div>
+<p>Rate limiting by user ID</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> checkRateLimit(context.auth.uid, <span class="hljs-string">'google-connect'</span>);
+
+    <span class="hljs-keyword">const</span> { code } = data;
+    <span class="hljs-keyword">if</span> (!code) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"invalid-argument"</span>, <span class="hljs-string">"Authorization code required"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-113" id="section-113"></a>
+</div>
+<p>Exchange code for tokens</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+    <span class="hljs-keyword">const</span> CLIENT_SECRET = <span class="hljs-keyword">await</span> secretManager.getSecret(<span class="hljs-string">'google-client-secret'</span>);
+    <span class="hljs-keyword">const</span> REDIRECT_URI = <span class="hljs-string">'postmessage'</span>; <span class="hljs-comment">// For popup mode</span>
+
+    <span class="hljs-keyword">const</span> oauth2Client = <span class="hljs-keyword">new</span> OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
+    <span class="hljs-keyword">const</span> { tokens } = <span class="hljs-keyword">await</span> oauth2Client.getToken(code);
+
+    <span class="hljs-keyword">if</span> (!tokens.refresh_token) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"No refresh token received"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-114" id="section-114"></a>
+</div>
+<p>Encrypt and store refresh token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> encryptedRefreshToken = <span class="hljs-keyword">await</span> encrypt(tokens.refresh_token, <span class="hljs-string">`google:<span class="hljs-subst">${context.auth.uid}</span>`</span>);
+    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).set({
+      encryptedRefreshToken,
+      <span class="hljs-attr">hasRefreshToken</span>: <span class="hljs-literal">true</span>,
+      <span class="hljs-attr">createdAt</span>: admin.firestore.FieldValue.serverTimestamp(),
+      <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-115" id="section-115"></a>
+</div>
+<p>Store access token in cache (backend only)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    accessTokenCache.set(context.auth.uid, {
+      <span class="hljs-attr">token</span>: tokens.access_token,
+      <span class="hljs-attr">expiry</span>: <span class="hljs-built_in">Date</span>.now() + (tokens.expiry_date || <span class="hljs-number">3600</span> * <span class="hljs-number">1000</span>)
+    });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-116" id="section-116"></a>
+</div>
+<p>BFF Pattern: Don't return access token to frontend</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">return</span> {
+      <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>,
+      <span class="hljs-attr">connected</span>: <span class="hljs-literal">true</span>
+    };
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Authentication failed. Please try again."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-117" id="section-117"></a>
+</div>
+<p>Helper function to get valid access token with better error handling</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">async</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">getValidAccessToken</span>(<span class="hljs-params">userId</span>) </span>{
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-118" id="section-118"></a>
+</div>
+<p>Check memory cache first</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> cached = accessTokenCache.get(userId);
+    <span class="hljs-keyword">if</span> (cached &amp;&amp; <span class="hljs-built_in">Date</span>.now() &lt; cached.expiry - <span class="hljs-number">60000</span>) { <span class="hljs-comment">// 1 minute buffer</span>
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getValidAccessToken] Using cached token for user:'</span>, userId);
+      <span class="hljs-keyword">return</span> cached.token;
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-119" id="section-119"></a>
+</div>
+<p>Get refresh token from Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> credDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(userId).get();
+    <span class="hljs-keyword">if</span> (!credDoc.exists || !credDoc.data().encryptedRefreshToken) {
+      <span class="hljs-built_in">console</span>.error(<span class="hljs-string">'[getValidAccessToken] No refresh token found for user:'</span>, userId);
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"No refresh token found. Please complete OAuth setup."</span>);
+    }
+
+    <span class="hljs-keyword">const</span> decryptedRefreshToken = <span class="hljs-keyword">await</span> decrypt(credDoc.data().encryptedRefreshToken);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-120" id="section-120"></a>
+</div>
+<p>Get OAuth config</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+    <span class="hljs-keyword">const</span> CLIENT_SECRET = <span class="hljs-keyword">await</span> secretManager.getSecret(<span class="hljs-string">'google-client-secret'</span>);
+    
+    <span class="hljs-keyword">if</span> (!CLIENT_ID || !CLIENT_SECRET) {
+      <span class="hljs-built_in">console</span>.error(<span class="hljs-string">'[getValidAccessToken] Missing OAuth configuration'</span>);
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"OAuth configuration error"</span>);
+    }
+    
+    <span class="hljs-keyword">const</span> oauth2Client = <span class="hljs-keyword">new</span> OAuth2Client(CLIENT_ID, CLIENT_SECRET);
+    oauth2Client.setCredentials({ <span class="hljs-attr">refresh_token</span>: decryptedRefreshToken });
+    
+    <span class="hljs-keyword">try</span> {
+      <span class="hljs-keyword">const</span> { credentials } = <span class="hljs-keyword">await</span> oauth2Client.refreshAccessToken();
+      
+      <span class="hljs-keyword">if</span> (!credentials.access_token) {
+        <span class="hljs-built_in">console</span>.error(<span class="hljs-string">'[getValidAccessToken] No access token in refresh response'</span>);
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Error</span>(<span class="hljs-string">'Failed to obtain access token'</span>);
+      }
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-121" id="section-121"></a>
+</div>
+<p>Cache the new access token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      accessTokenCache.set(userId, {
+        <span class="hljs-attr">token</span>: credentials.access_token,
+        <span class="hljs-attr">expiry</span>: credentials.expiry_date || <span class="hljs-built_in">Date</span>.now() + <span class="hljs-number">3600</span> * <span class="hljs-number">1000</span>
+      });
+      
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getValidAccessToken] Successfully refreshed token for user:'</span>, userId);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-122" id="section-122"></a>
+</div>
+<p>Update last used timestamp</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> credDoc.ref.update({
+      <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+    });
+      <span class="hljs-keyword">return</span> credentials.access_token;
+    } <span class="hljs-keyword">catch</span> (error) {
+      <span class="hljs-built_in">console</span>.error(<span class="hljs-string">'[getValidAccessToken] Token refresh error:'</span>, error.message);
+      
+      <span class="hljs-keyword">if</span> (error.message?.includes(<span class="hljs-string">'invalid_grant'</span>)) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-123" id="section-123"></a>
+</div>
+<p>Delete invalid credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">        <span class="hljs-keyword">await</span> credDoc.ref.delete();
+        accessTokenCache.delete(userId);
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+          <span class="hljs-string">"unauthenticated"</span>, 
+          <span class="hljs-string">"Google Calendar 연동이 만료되었습니다. 다시 연동해주세요."</span>
+        );
+      }
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-124" id="section-124"></a>
+</div>
+<p>Generic token refresh error</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"internal"</span>,
+        <span class="hljs-string">"Failed to refresh access token. Please try again."</span>
+      );
+    }
+  } <span class="hljs-keyword">catch</span> (outerError) {
+    <span class="hljs-built_in">console</span>.error(<span class="hljs-string">'[getValidAccessToken] Unexpected error:'</span>, outerError);
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+      <span class="hljs-string">"internal"</span>,
+      <span class="hljs-string">"Authentication error. Please try reconnecting."</span>
+    );
+  }
+}
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-125" id="section-125"></a>
+</div>
+<p>Refresh access token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarRefreshToken = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-126" id="section-126"></a>
+</div>
+<p>Get stored refresh token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> credDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).get();
+    <span class="hljs-keyword">if</span> (!credDoc.exists) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"not-found"</span>, <span class="hljs-string">"No Google Calendar connection found"</span>);
+    }
+
+    <span class="hljs-keyword">const</span> decryptedRefreshToken = <span class="hljs-keyword">await</span> decrypt(credDoc.data().encryptedRefreshToken);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-127" id="section-127"></a>
+</div>
+<p>Get OAuth config</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+    <span class="hljs-keyword">const</span> CLIENT_SECRET = <span class="hljs-keyword">await</span> secretManager.getSecret(<span class="hljs-string">'google-client-secret'</span>);
+    
+    <span class="hljs-keyword">const</span> oauth2Client = <span class="hljs-keyword">new</span> OAuth2Client(CLIENT_ID, CLIENT_SECRET);
+    oauth2Client.setCredentials({ <span class="hljs-attr">refresh_token</span>: decryptedRefreshToken });
+    
+    <span class="hljs-keyword">const</span> { credentials } = <span class="hljs-keyword">await</span> oauth2Client.refreshAccessToken();
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-128" id="section-128"></a>
+</div>
+<p>Cache the new access token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    accessTokenCache.set(context.auth.uid, {
+      <span class="hljs-attr">token</span>: credentials.access_token,
+      <span class="hljs-attr">expiry</span>: credentials.expiry_date || <span class="hljs-built_in">Date</span>.now() + <span class="hljs-number">3600</span> * <span class="hljs-number">1000</span>
+    });
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-129" id="section-129"></a>
+</div>
+<p>Update last used timestamp</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> credDoc.ref.update({
+      <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-130" id="section-130"></a>
+</div>
+<p>BFF Pattern: Don't return access token to frontend</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">return</span> {
+      <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>,
+      <span class="hljs-attr">tokenRefreshed</span>: <span class="hljs-literal">true</span>
+    };
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error.message?.includes(<span class="hljs-string">'invalid_grant'</span>)) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-131" id="section-131"></a>
+</div>
+<p>Delete invalid credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).delete();
+      accessTokenCache.delete(context.auth.uid);
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+        <span class="hljs-string">"unauthenticated"</span>, 
+        <span class="hljs-string">"Google Calendar connection expired. Please reconnect."</span>
+      );
+    }
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Token refresh failed. Please reconnect."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-132" id="section-132"></a>
+</div>
+<p>Check connection status</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarCheckStatus = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-133" id="section-133"></a>
+</div>
+<p>Check if refresh token exists</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> credDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).get();
+    <span class="hljs-keyword">if</span> (!credDoc.exists) {
+      <span class="hljs-keyword">return</span> { <span class="hljs-attr">connected</span>: <span class="hljs-literal">false</span> };
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-134" id="section-134"></a>
+</div>
+<p>Check cached access token (backend only)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> cached = accessTokenCache.get(context.auth.uid);
+    <span class="hljs-keyword">const</span> hasValidToken = cached &amp;&amp; <span class="hljs-built_in">Date</span>.now() &lt; cached.expiry - <span class="hljs-number">60000</span>;
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-135" id="section-135"></a>
+</div>
+<p>BFF Pattern: Don't expose token details</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">return</span> { 
+      <span class="hljs-attr">connected</span>: <span class="hljs-literal">true</span>,
+      <span class="hljs-attr">tokenValid</span>: hasValidToken
+    };
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Status check failed."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-136" id="section-136"></a>
+</div>
+<p>Disconnect Google Calendar</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarDisconnect = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-137" id="section-137"></a>
+</div>
+<p>Delete stored credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).delete();
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-138" id="section-138"></a>
+</div>
+<p>Clear cache</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    accessTokenCache.delete(context.auth.uid);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-139" id="section-139"></a>
+</div>
+<p>Google Calendar disconnected</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">return</span> { <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span> };
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Disconnection failed. Please try again."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-140" id="section-140"></a>
+</div>
+<p>DEPRECATED - Remove after migration</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarStoreRefreshToken = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-141" id="section-141"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+    <span class="hljs-keyword">const</span> { refreshToken } = data;
+    <span class="hljs-keyword">if</span> (!refreshToken) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"invalid-argument"</span>, <span class="hljs-string">"Refresh token required"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-142" id="section-142"></a>
+</div>
+<p>Encrypt and store refresh token
+Encrypting refresh token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> encryptedRefreshToken = <span class="hljs-keyword">await</span> encrypt(refreshToken, <span class="hljs-string">`google:<span class="hljs-subst">${context.auth.uid}</span>`</span>);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-143" id="section-143"></a>
+</div>
+<p>Storing encrypted credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).set({
+      encryptedRefreshToken,
+      <span class="hljs-attr">createdAt</span>: admin.firestore.FieldValue.serverTimestamp(),
+      <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+    });
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-144" id="section-144"></a>
+</div>
+<p>Credentials stored</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span> };
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Failed to save credentials. Please try again."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-145" id="section-145"></a>
+</div>
+<p>Original Google Calendar auth function (kept for backward compatibility)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarAuth = functions
+  .region(<span class="hljs-string">'asia-northeast3'</span>)
+  .runWith({
+    <span class="hljs-attr">timeoutSeconds</span>: <span class="hljs-number">60</span>,
+    <span class="hljs-attr">memory</span>: <span class="hljs-string">'512MB'</span>  <span class="hljs-comment">// Increased memory for better performance</span>
+  })
+  .https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-146" id="section-146"></a>
+</div>
+<p>googleCalendarAuth called</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-147" id="section-147"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-148" id="section-148"></a>
+</div>
+<p>Rate limiting by user ID</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> checkRateLimit(context.auth.uid, <span class="hljs-string">'google-auth'</span>);
+
+    <span class="hljs-keyword">const</span> { code } = data;
+    
+    <span class="hljs-keyword">if</span> (!code) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"invalid-argument"</span>, <span class="hljs-string">"Authorization code is required"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-149" id="section-149"></a>
+</div>
+<p>Google Client ID from environment variable (public info)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+
+    
+    <span class="hljs-keyword">if</span> (!CLIENT_ID) {
+
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"Google Client ID not configured"</span>);
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-150" id="section-150"></a>
+</div>
+<p>Client Secret from Secret Manager (sensitive)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">let</span> CLIENT_SECRET;
+    <span class="hljs-keyword">try</span> {
+      CLIENT_SECRET = <span class="hljs-keyword">await</span> secretManager.getSecret(<span class="hljs-string">'google-client-secret'</span>);
+
+
+
+    } <span class="hljs-keyword">catch</span> (error) {
+
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"Google OAuth secret not configured in Secret Manager"</span>);
+    }
+    
+    <span class="hljs-keyword">const</span> REDIRECT_URI = <span class="hljs-string">'postmessage'</span>; <span class="hljs-comment">// Standard for Google Sign-In</span>
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-151" id="section-151"></a>
+</div>
+<p>Exchange authorization code for tokens</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> tokenResponse = <span class="hljs-keyword">await</span> fetch(<span class="hljs-string">'https://oauth2.googleapis.com/token'</span>, {
+      <span class="hljs-attr">method</span>: <span class="hljs-string">'POST'</span>,
+      <span class="hljs-attr">headers</span>: {
+        <span class="hljs-string">'Content-Type'</span>: <span class="hljs-string">'application/x-www-form-urlencoded'</span>,
+      },
+      <span class="hljs-attr">body</span>: <span class="hljs-keyword">new</span> URLSearchParams({
+        code,
+        <span class="hljs-attr">client_id</span>: CLIENT_ID,
+        <span class="hljs-attr">client_secret</span>: CLIENT_SECRET,
+        <span class="hljs-attr">redirect_uri</span>: REDIRECT_URI,
+        <span class="hljs-attr">grant_type</span>: <span class="hljs-string">'authorization_code'</span>,
+      }),
+    });
+
+    <span class="hljs-keyword">if</span> (!tokenResponse.ok) {
+      <span class="hljs-keyword">const</span> error = <span class="hljs-keyword">await</span> tokenResponse.text();
+
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">`Failed to exchange authorization code: <span class="hljs-subst">${error}</span>`</span>);
+    }
+
+    <span class="hljs-keyword">const</span> tokens = <span class="hljs-keyword">await</span> tokenResponse.json();
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-152" id="section-152"></a>
+</div>
+<p>Get user info</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> userInfoResponse = <span class="hljs-keyword">await</span> fetch(<span class="hljs-string">'https://www.googleapis.com/oauth2/v3/userinfo'</span>, {
+      <span class="hljs-attr">headers</span>: { <span class="hljs-attr">Authorization</span>: <span class="hljs-string">`Bearer <span class="hljs-subst">${tokens.access_token}</span>`</span> },
+    });
+
+    <span class="hljs-keyword">if</span> (!userInfoResponse.ok) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Failed to fetch user info"</span>);
+    }
+
+    <span class="hljs-keyword">const</span> userInfo = <span class="hljs-keyword">await</span> userInfoResponse.json();
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-153" id="section-153"></a>
+</div>
+<p>Store encrypted refresh token in Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (tokens.refresh_token) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-154" id="section-154"></a>
+</div>
+<p>Encrypting refresh token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">const</span> encryptedRefreshToken = <span class="hljs-keyword">await</span> encrypt(tokens.refresh_token, <span class="hljs-string">`google:<span class="hljs-subst">${context.auth.uid}</span>`</span>);
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-155" id="section-155"></a>
+</div>
+<p>Storing encrypted credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).set({
+        encryptedRefreshToken,
+        userInfo,
+        <span class="hljs-attr">createdAt</span>: admin.firestore.FieldValue.serverTimestamp(),
+        <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+      });
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-156" id="section-156"></a>
+</div>
+<p>Credentials stored</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-157" id="section-157"></a>
+</div>
+<p>This might happen if user has already authorized the app
+Check if we already have stored credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">const</span> existingCreds = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).get();
+      <span class="hljs-keyword">if</span> (!existingCreds.exists) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+          <span class="hljs-string">"failed-precondition"</span>, 
+          <span class="hljs-string">"No refresh token received. Please disconnect and reconnect Google Calendar."</span>
+        );
+      }
+    }
+
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-158" id="section-158"></a>
+</div>
+<p>BFF Pattern: Don't return access token to frontend</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">return</span> {
+      <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>,
+      userInfo
+    };
+  } <span class="hljs-keyword">catch</span> (error) {
+    
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Authentication failed. Please try again."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-159" id="section-159"></a>
+</div>
+<p>Google Calendar refresh token function</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarRefresh = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-160" id="section-160"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-161" id="section-161"></a>
+</div>
+<p>Retrieve encrypted refresh token from Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> credDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).get();
+    
+    <span class="hljs-keyword">if</span> (!credDoc.exists) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"not-found"</span>, <span class="hljs-string">"Google Calendar not connected"</span>);
+    }
+
+    <span class="hljs-keyword">const</span> credData = credDoc.data();
+    <span class="hljs-keyword">const</span> decryptedRefreshToken = <span class="hljs-keyword">await</span> decrypt(credData.encryptedRefreshToken);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-162" id="section-162"></a>
+</div>
+<p>Google Client ID from environment variable (public info)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+
+    
+    <span class="hljs-keyword">if</span> (!CLIENT_ID) {
+
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"Google Client ID not configured"</span>);
+    }
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-163" id="section-163"></a>
+</div>
+<p>Client Secret from Secret Manager (sensitive)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">let</span> CLIENT_SECRET;
+    <span class="hljs-keyword">try</span> {
+      CLIENT_SECRET = <span class="hljs-keyword">await</span> secretManager.getSecret(<span class="hljs-string">'google-client-secret'</span>);
+
+    } <span class="hljs-keyword">catch</span> (error) {
+
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"Google OAuth secret not configured in Secret Manager"</span>);
+    }
+
+    <span class="hljs-keyword">if</span> (!CLIENT_ID || !CLIENT_SECRET) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"Google OAuth not configured"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-164" id="section-164"></a>
+</div>
+<p>Refresh the token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> refreshResponse = <span class="hljs-keyword">await</span> fetch(<span class="hljs-string">'https://oauth2.googleapis.com/token'</span>, {
+      <span class="hljs-attr">method</span>: <span class="hljs-string">'POST'</span>,
+      <span class="hljs-attr">headers</span>: {
+        <span class="hljs-string">'Content-Type'</span>: <span class="hljs-string">'application/x-www-form-urlencoded'</span>,
+      },
+      <span class="hljs-attr">body</span>: <span class="hljs-keyword">new</span> URLSearchParams({
+        <span class="hljs-attr">refresh_token</span>: decryptedRefreshToken,
+        <span class="hljs-attr">client_id</span>: CLIENT_ID,
+        <span class="hljs-attr">client_secret</span>: CLIENT_SECRET,
+        <span class="hljs-attr">grant_type</span>: <span class="hljs-string">'refresh_token'</span>,
+      }),
+    });
+
+    <span class="hljs-keyword">if</span> (!refreshResponse.ok) {
+      <span class="hljs-keyword">const</span> error = <span class="hljs-keyword">await</span> refreshResponse.text();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-165" id="section-165"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Failed to refresh token"</span>);
+    }
+
+    <span class="hljs-keyword">const</span> tokens = <span class="hljs-keyword">await</span> refreshResponse.json();
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-166" id="section-166"></a>
+</div>
+<p>Update last used timestamp</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> credDoc.ref.update({
+      <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-167" id="section-167"></a>
+</div>
+<p>BFF Pattern: Don't return access token to frontend</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">return</span> {
+      <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>
+    };
+  } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-168" id="section-168"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Token refresh failed. Please reconnect."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-169" id="section-169"></a>
+</div>
+<p>Google Calendar disconnect function (duplicate - DEPRECATED)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarDisconnectOld = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-170" id="section-170"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-171" id="section-171"></a>
+</div>
+<p>Delete encrypted credentials from Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).delete();
+
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span> };
+  } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-172" id="section-172"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+      <span class="hljs-string">"internal"</span>,
+      error.message || <span class="hljs-string">"Failed to disconnect Google Calendar"</span>
+    );
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-173" id="section-173"></a>
+</div>
+<p>Get Google Calendar events using backend proxy pattern (secure)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.getGoogleCalendarEvents = functions
+  .region(<span class="hljs-string">'asia-northeast3'</span>)
+  .runWith({
+    <span class="hljs-attr">timeoutSeconds</span>: <span class="hljs-number">60</span>,
+    <span class="hljs-attr">memory</span>: <span class="hljs-string">'512MB'</span>
+  })
+  .https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Function called with data:'</span>, <span class="hljs-built_in">JSON</span>.stringify(data));
+    
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-174" id="section-174"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] No auth context'</span>);
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] User ID:'</span>, context.auth.uid);
+
+    <span class="hljs-keyword">const</span> { startDate, endDate, eventType, startTime, endTime, selectedDays } = data;
+    <span class="hljs-keyword">if</span> (!startDate || !endDate) {
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Missing dates'</span>);
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"invalid-argument"</span>, <span class="hljs-string">"Start date and end date are required"</span>);
+    }
+    
+    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Parameters:'</span>, {
+      startDate,
+      endDate,
+      eventType,
+      startTime,
+      endTime,
+      selectedDays
+    });
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-175" id="section-175"></a>
+</div>
+<p>Get valid access token using refresh token from Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Getting access token for user:'</span>, context.auth.uid);
+    <span class="hljs-keyword">const</span> accessToken = <span class="hljs-keyword">await</span> getValidAccessToken(context.auth.uid);
+    <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Access token obtained:'</span>, accessToken ? <span class="hljs-string">'Yes'</span> : <span class="hljs-string">'No'</span>);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-176" id="section-176"></a>
+</div>
+<p>Use direct Google API client with access token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> oauth2Client = <span class="hljs-keyword">new</span> OAuth2Client();
+    oauth2Client.setCredentials({ <span class="hljs-attr">access_token</span>: accessToken });
+    
+    <span class="hljs-keyword">const</span> calendar = google.calendar({<span class="hljs-attr">version</span>: <span class="hljs-string">'v3'</span>, <span class="hljs-attr">auth</span>: oauth2Client});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-177" id="section-177"></a>
+</div>
+<p>Exponential backoff helper</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> withExponentialBackoff = <span class="hljs-keyword">async</span> (fn, maxRetries = <span class="hljs-number">3</span>) =&gt; {
+      <span class="hljs-keyword">let</span> lastError;
+      <span class="hljs-keyword">for</span> (<span class="hljs-keyword">let</span> i = <span class="hljs-number">0</span>; i &lt; maxRetries; i++) {
+        <span class="hljs-keyword">try</span> {
+          <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> fn();
+        } <span class="hljs-keyword">catch</span> (error) {
+          lastError = error;
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-178" id="section-178"></a>
+</div>
+<p>Only retry on quota errors (403) or rate limit errors (429)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">if</span> (error.code === <span class="hljs-number">403</span> || error.code === <span class="hljs-number">429</span>) {
+            <span class="hljs-keyword">const</span> delay = <span class="hljs-built_in">Math</span>.pow(<span class="hljs-number">2</span>, i) * <span class="hljs-number">1000</span> + <span class="hljs-built_in">Math</span>.random() * <span class="hljs-number">1000</span>; <span class="hljs-comment">// 1s, 2s, 4s + jitter</span>
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-179" id="section-179"></a>
+</div>
+<p>Rate limited, retrying</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            <span class="hljs-keyword">await</span> <span class="hljs-keyword">new</span> <span class="hljs-built_in">Promise</span>(<span class="hljs-function"><span class="hljs-params">resolve</span> =&gt;</span> setTimeout(resolve, delay));
+            <span class="hljs-keyword">continue</span>;
+          }
+          <span class="hljs-keyword">throw</span> error;
+        }
+      }
+      <span class="hljs-keyword">throw</span> lastError;
+    };
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-180" id="section-180"></a>
+</div>
+<p>Fetch calendar events with exponential backoff</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">try</span> {
+      <span class="hljs-keyword">const</span> timeMin = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(startDate).toISOString();
+      <span class="hljs-keyword">const</span> timeMax = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(endDate).toISOString();
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Fetching events from Google Calendar:'</span>, {
+        timeMin,
+        timeMax
+      });
+      
+      <span class="hljs-keyword">const</span> response = <span class="hljs-keyword">await</span> withExponentialBackoff(<span class="hljs-keyword">async</span> () =&gt; {
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">await</span> calendar.events.list({
+          <span class="hljs-attr">calendarId</span>: <span class="hljs-string">'primary'</span>,
+          <span class="hljs-attr">timeMin</span>: timeMin,
+          <span class="hljs-attr">timeMax</span>: timeMax,
+          <span class="hljs-attr">singleEvents</span>: <span class="hljs-literal">true</span>,
+          <span class="hljs-attr">orderBy</span>: <span class="hljs-string">'startTime'</span>,
+          <span class="hljs-attr">maxResults</span>: <span class="hljs-number">250</span>,
+          <span class="hljs-attr">fields</span>: <span class="hljs-string">'items(id,summary,start,end,status,transparency,recurringEventId)'</span>
+        });
+      });
+      
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Google Calendar API response:'</span>, {
+        <span class="hljs-attr">itemsCount</span>: response.data.items ? response.data.items.length : <span class="hljs-number">0</span>,
+        <span class="hljs-attr">hasItems</span>: !!response.data.items
+      });
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-181" id="section-181"></a>
+</div>
+<p>Process events</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">let</span> events = (response.data.items || []).map(<span class="hljs-function"><span class="hljs-params">event</span> =&gt;</span> ({
+        <span class="hljs-attr">id</span>: event.id,
+        <span class="hljs-attr">title</span>: event.summary || <span class="hljs-string">'Untitled'</span>,
+        <span class="hljs-attr">start</span>: event.start.dateTime || event.start.date,
+        <span class="hljs-attr">end</span>: event.end.dateTime || event.end.date,
+        <span class="hljs-attr">isAllDay</span>: !event.start.dateTime,
+        <span class="hljs-attr">status</span>: event.status,
+        <span class="hljs-attr">transparency</span>: event.transparency || <span class="hljs-string">'opaque'</span>,
+        <span class="hljs-attr">isRecurring</span>: !!event.recurringEventId,
+      }));
+
+      <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Raw events count:'</span>, events.length);
+      <span class="hljs-keyword">if</span> (events.length &gt; <span class="hljs-number">0</span>) {
+        <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Sample event:'</span>, <span class="hljs-built_in">JSON</span>.stringify(events[<span class="hljs-number">0</span>]));
+      }
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-182" id="section-182"></a>
+</div>
+<p>Filter events based on eventType and selectedDays on the backend</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">if</span> (eventType === <span class="hljs-string">'day'</span> &amp;&amp; selectedDays &amp;&amp; selectedDays.length &gt; <span class="hljs-number">0</span>) {
+        <span class="hljs-keyword">const</span> beforeCount = events.length;
+        <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Filtering for day-based events. Selected days:'</span>, selectedDays);
+        events = events.filter(<span class="hljs-function"><span class="hljs-params">event</span> =&gt;</span> {
+          <span class="hljs-keyword">const</span> eventDate = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(event.start);
+          <span class="hljs-keyword">const</span> dayIndex = eventDate.getDay();
+          <span class="hljs-keyword">const</span> dayNames = [<span class="hljs-string">'Sun'</span>, <span class="hljs-string">'Mon'</span>, <span class="hljs-string">'Tue'</span>, <span class="hljs-string">'Wed'</span>, <span class="hljs-string">'Thu'</span>, <span class="hljs-string">'Fri'</span>, <span class="hljs-string">'Sat'</span>];
+          <span class="hljs-keyword">const</span> dayName = dayNames[dayIndex];
+          <span class="hljs-keyword">const</span> isIncluded = selectedDays.includes(dayName);
+          <span class="hljs-keyword">if</span> (!isIncluded &amp;&amp; events.length &lt; <span class="hljs-number">10</span>) { <span class="hljs-comment">// Log only first few exclusions</span>
+            <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`[getGoogleCalendarEvents] Event on <span class="hljs-subst">${dayName}</span> (<span class="hljs-subst">${event.start}</span>) excluded`</span>);
+          }
+          <span class="hljs-keyword">return</span> isIncluded;
+        });
+        <span class="hljs-built_in">console</span>.log(<span class="hljs-string">`[getGoogleCalendarEvents] Day filter applied: <span class="hljs-subst">${beforeCount}</span> -&gt; <span class="hljs-subst">${events.length}</span>`</span>);
+      }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-183" id="section-183"></a>
+</div>
+<p>Filter by time range if provided</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">if</span> (startTime &amp;&amp; endTime &amp;&amp; eventType !== <span class="hljs-string">'day'</span>) {
+        <span class="hljs-keyword">const</span> beforeCount = events.length;
+        <span class="hljs-built_in">console</span>.log(<span class="hljs-string">'[getGoogleCalendarEvents] Filtering by time range:'</span>, { startTime, endTime });
+        events = events.filter(<span class="hljs-function"><span class="hljs-params">event</span> =&gt;</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-184" id="section-184"></a>
+</div>
+<p>For all-day events, include them by default</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">if</span> (event.isAllDay) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-185" id="section-185"></a>
+</div>
+<p>Including all-day event</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>;
+          }
+          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-186" id="section-186"></a>
+</div>
+<p>Parse event time - extract hours/minutes from the original timezone string
+Event.start is in format &quot;2025-07-28T11:00:00+09:00&quot;</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">let</span> hours, minutes;
+          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-187" id="section-187"></a>
+</div>
+<p>Check if the date string contains timezone info (has + or - for timezone offset)</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">if</span> (event.start.includes(<span class="hljs-string">'T'</span>) &amp;&amp; (event.start.includes(<span class="hljs-string">'+'</span>) || event.start.includes(<span class="hljs-string">'-'</span>))) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-188" id="section-188"></a>
+</div>
+<p>Extract time from the ISO string directly without timezone conversion</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            <span class="hljs-keyword">const</span> timeMatch = event.start.match(<span class="hljs-regexp">/T(\d{2}):(\d{2})/</span>);
+            <span class="hljs-keyword">if</span> (timeMatch) {
+              hours = <span class="hljs-built_in">parseInt</span>(timeMatch[<span class="hljs-number">1</span>], <span class="hljs-number">10</span>);
+              minutes = <span class="hljs-built_in">parseInt</span>(timeMatch[<span class="hljs-number">2</span>], <span class="hljs-number">10</span>);
+            } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-189" id="section-189"></a>
+</div>
+<p>Fallback to Date parsing</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">              <span class="hljs-keyword">const</span> eventStartTime = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(event.start);
+              hours = eventStartTime.getHours();
+              minutes = eventStartTime.getMinutes();
+            }
+          } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-190" id="section-190"></a>
+</div>
+<p>For dates without timezone, use regular Date parsing</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            <span class="hljs-keyword">const</span> eventStartTime = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(event.start);
+            hours = eventStartTime.getHours();
+            minutes = eventStartTime.getMinutes();
+          }
+          
+          <span class="hljs-keyword">const</span> eventTimeMinutes = hours * <span class="hljs-number">60</span> + minutes;
+          
+          <span class="hljs-keyword">const</span> [startHour, startMinute] = startTime.split(<span class="hljs-string">':'</span>).map(<span class="hljs-built_in">Number</span>);
+          <span class="hljs-keyword">const</span> [endHour, endMinute] = endTime.split(<span class="hljs-string">':'</span>).map(<span class="hljs-built_in">Number</span>);
+          <span class="hljs-keyword">const</span> startTimeMinutes = startHour * <span class="hljs-number">60</span> + startMinute;
+          <span class="hljs-keyword">const</span> endTimeMinutes = endHour * <span class="hljs-number">60</span> + endMinute;
+          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-191" id="section-191"></a>
+</div>
+<p>Check if event overlaps with the time range</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">let</span> eventEndHours, eventEndMinutes;
+          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-192" id="section-192"></a>
+</div>
+<p>Parse end time the same way</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">if</span> (event.end.includes(<span class="hljs-string">'T'</span>) &amp;&amp; (event.end.includes(<span class="hljs-string">'+'</span>) || event.end.includes(<span class="hljs-string">'-'</span>))) {
+            <span class="hljs-keyword">const</span> endTimeMatch = event.end.match(<span class="hljs-regexp">/T(\d{2}):(\d{2})/</span>);
+            <span class="hljs-keyword">if</span> (endTimeMatch) {
+              eventEndHours = <span class="hljs-built_in">parseInt</span>(endTimeMatch[<span class="hljs-number">1</span>], <span class="hljs-number">10</span>);
+              eventEndMinutes = <span class="hljs-built_in">parseInt</span>(endTimeMatch[<span class="hljs-number">2</span>], <span class="hljs-number">10</span>);
+            } <span class="hljs-keyword">else</span> {
+              <span class="hljs-keyword">const</span> eventEndTime = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(event.end);
+              eventEndHours = eventEndTime.getHours();
+              eventEndMinutes = eventEndTime.getMinutes();
+            }
+          } <span class="hljs-keyword">else</span> {
+            <span class="hljs-keyword">const</span> eventEndTime = <span class="hljs-keyword">new</span> <span class="hljs-built_in">Date</span>(event.end);
+            eventEndHours = eventEndTime.getHours();
+            eventEndMinutes = eventEndTime.getMinutes();
+          }
+          
+          <span class="hljs-keyword">const</span> eventEndTimeMinutes = eventEndHours * <span class="hljs-number">60</span> + eventEndMinutes;
+          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-193" id="section-193"></a>
+</div>
+<p>Debug log for all events
+Event time validation</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-194" id="section-194"></a>
+</div>
+<p>Handle events that cross midnight</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          <span class="hljs-keyword">let</span> overlaps;
+          <span class="hljs-keyword">if</span> (eventEndTimeMinutes &lt; eventTimeMinutes) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-195" id="section-195"></a>
+</div>
+<p>Event crosses midnight (e.g., 23:00 to 00:00)
+Event crosses midnight
+Check if any part of the event falls within the time range</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            overlaps = (eventTimeMinutes &lt; endTimeMinutes) || (eventEndTimeMinutes &gt; startTimeMinutes);
+          } <span class="hljs-keyword">else</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-196" id="section-196"></a>
+</div>
+<p>Normal event
+Event overlaps if it starts before range ends AND ends after range starts</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">            overlaps = eventTimeMinutes &lt; endTimeMinutes &amp;&amp; eventEndTimeMinutes &gt; startTimeMinutes;
+          }
+          
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-197" id="section-197"></a>
+</div>
+<p>Event filtering result</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">          
+          <span class="hljs-keyword">return</span> overlaps;
+        });
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-198" id="section-198"></a>
+</div>
+<p>Time filter applied</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-199" id="section-199"></a>
+</div>
+<p>Filtering completed</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">return</span> { events };
+    } <span class="hljs-keyword">catch</span> (calendarError) {
+      
+      <span class="hljs-keyword">if</span> (calendarError.code === <span class="hljs-number">401</span>) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-200" id="section-200"></a>
+</div>
+<p>Token might be expired, clear from cache and throw error</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">        accessTokenCache.delete(context.auth.uid);
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+          <span class="hljs-string">"unauthenticated"</span>, 
+          <span class="hljs-string">"Google Calendar 인증이 만료되었습니다. 다시 시도해주세요."</span>
+        );
+      }
+      
+      <span class="hljs-keyword">throw</span> calendarError;
+    }
+    
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Failed to fetch events. Please try again."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-201" id="section-201"></a>
+</div>
+<p>New function to disconnect Apple Calendar</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.appleCalendarDisconnect = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-202" id="section-202"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-203" id="section-203"></a>
+</div>
+<p>Delete encrypted credentials from Firestore</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'apple_credentials'</span>).doc(context.auth.uid).delete();
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-204" id="section-204"></a>
+</div>
+<p>Remove cached DAV client</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    davClientCache.delete(context.auth.uid);
+    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-205" id="section-205"></a>
+</div>
+<p>Also remove from user document</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'users'</span>).doc(context.auth.uid).update({
+      <span class="hljs-attr">appleCalendar</span>: admin.firestore.FieldValue.delete()
+    });
+
+    <span class="hljs-keyword">return</span> { <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span> };
+  } <span class="hljs-keyword">catch</span> (error) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-206" id="section-206"></a>
+</div>
+<p>Console statement removed for production</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+      <span class="hljs-string">"internal"</span>,
+      error.message || <span class="hljs-string">"Failed to disconnect Apple Calendar"</span>
+    );
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-207" id="section-207"></a>
+</div>
+<p>Get fresh access token using stored refresh token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">exports.googleCalendarGetAccessToken = functions.region(<span class="hljs-string">'asia-northeast3'</span>).https.onCall(<span class="hljs-keyword">async</span> (data, context) =&gt; {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-208" id="section-208"></a>
+</div>
+<p>googleCalendarGetAccessToken called</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  
+  <span class="hljs-keyword">try</span> {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-209" id="section-209"></a>
+</div>
+<p>Verify user is authenticated</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">if</span> (!context.auth) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"unauthenticated"</span>, <span class="hljs-string">"User must be authenticated"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-210" id="section-210"></a>
+</div>
+<p>Get stored credentials
+Fetching Google credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> credDoc = <span class="hljs-keyword">await</span> db.collection(<span class="hljs-string">'google_credentials'</span>).doc(context.auth.uid).get();
+    <span class="hljs-keyword">if</span> (!credDoc.exists) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-211" id="section-211"></a>
+</div>
+<p>No Google credentials found</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"not-found"</span>, <span class="hljs-string">"Google Calendar not connected"</span>);
+    }
+
+    <span class="hljs-keyword">const</span> credData = credDoc.data();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-212" id="section-212"></a>
+</div>
+<p>Decrypting refresh token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> decryptedRefreshToken = <span class="hljs-keyword">await</span> decrypt(credData.encryptedRefreshToken);
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-213" id="section-213"></a>
+</div>
+<p>Get secrets</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> CLIENT_ID = process.env.GOOGLE_CLIENT_ID || functions.config().google?.client_id;
+    <span class="hljs-keyword">let</span> CLIENT_SECRET;
+    <span class="hljs-keyword">try</span> {
+      CLIENT_SECRET = <span class="hljs-keyword">await</span> secretManager.getSecret(<span class="hljs-string">'google-client-secret'</span>);
+    } <span class="hljs-keyword">catch</span> (error) {
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"failed-precondition"</span>, <span class="hljs-string">"Google OAuth secret not configured"</span>);
+    }
+
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-214" id="section-214"></a>
+</div>
+<p>Refreshing access token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-215" id="section-215"></a>
+</div>
+<p>Use OAuth2Client to refresh the token</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> oauth2Client = <span class="hljs-keyword">new</span> OAuth2Client(
+      CLIENT_ID,
+      CLIENT_SECRET
+    );
+    
+    oauth2Client.setCredentials({
+      <span class="hljs-attr">refresh_token</span>: decryptedRefreshToken
+    });
+    
+    <span class="hljs-keyword">try</span> {
+      <span class="hljs-keyword">const</span> { credentials } = <span class="hljs-keyword">await</span> oauth2Client.refreshAccessToken();
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-216" id="section-216"></a>
+</div>
+<p>Access token refreshed</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-217" id="section-217"></a>
+</div>
+<p>Update last used timestamp</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">await</span> credDoc.ref.update({
+        <span class="hljs-attr">lastUsed</span>: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-218" id="section-218"></a>
+</div>
+<p>BFF Pattern: Don't return access token to frontend</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">      <span class="hljs-keyword">return</span> {
+        <span class="hljs-attr">success</span>: <span class="hljs-literal">true</span>,
+        <span class="hljs-attr">tokenRefreshed</span>: <span class="hljs-literal">true</span>
+      };
+    } <span class="hljs-keyword">catch</span> (refreshError) {
+      
+      <span class="hljs-keyword">if</span> (refreshError.message?.includes(<span class="hljs-string">'invalid_grant'</span>)) {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-219" id="section-219"></a>
+</div>
+<p>Refresh token is invalid or expired
+Delete the invalid credentials</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">        <span class="hljs-keyword">await</span> credDoc.ref.delete();
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(
+          <span class="hljs-string">"unauthenticated"</span>, 
+          <span class="hljs-string">"Google Calendar 연동이 만료되었습니다. 다시 연동해주세요."</span>
+        );
+      }
+      
+      <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, refreshError.message || <span class="hljs-string">"Failed to refresh token"</span>);
+    }
+  } <span class="hljs-keyword">catch</span> (error) {
+    <span class="hljs-keyword">if</span> (error <span class="hljs-keyword">instanceof</span> functions.https.HttpsError) {
+      <span class="hljs-keyword">throw</span> error;
+    }
+    <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> functions.https.HttpsError(<span class="hljs-string">"internal"</span>, <span class="hljs-string">"Authentication failed. Please reconnect."</span>);
+  }
+});
+
+</pre>
+        </td>
+      </tr>
+    
+  </tbody>
+</table>
+
+  </div>
+</body>
+</html>

@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CLAUDE.md</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="doc-style.css" />
+  <script src="doc-filelist.js"></script>
+  <script>
+    var relativeDir = "";
+    var thisFile = "CLAUDE.md";
+    var defaultSidebar = true;
+  </script>
+  <script src="doc-script.js"></script>
+
+</head>
+<body>
+  <div id="sidebar_wrapper">
+    <div id="sidebar_switch">
+      <span class="tree">Files</span>
+      <span class="headings">Headings</span>
+    </div>
+    <div id="tree"></div>
+    <div id="headings">
+
+      <div class="heading h1">
+        <a href="#claude.md">CLAUDE.md</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#project-overview">Project Overview</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#core-features">Core Features</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#commands">Commands</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#development">Development</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#firebase-cloud-functions">Firebase Cloud Functions</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#deployment">Deployment</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#architecture">Architecture</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#tech-stack">Tech Stack</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#project-structure">Project Structure</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#key-architectural-patterns">Key Architectural Patterns</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#environment-setup">Environment Setup</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#key-features-implementation">Key Features Implementation</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#authentication-and-access">Authentication &amp;amp; Access</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#availability-selection">Availability Selection</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#calendar-integration">Calendar Integration</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#uiux-consistency">UI/UX Consistency</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#fixed-schedule">Fixed Schedule</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#build-configuration">Build Configuration</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#webpack-customization-config-overrides.js">Webpack Customization (config-overrides.js)</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#firebase-deployment">Firebase Deployment</a>
+      </div>
+
+      <div class="heading h2">
+        <a href="#development-tips">Development Tips</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#working-with-schedules">Working with Schedules</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#real-time-updates">Real-time Updates</a>
+      </div>
+
+      <div class="heading h3">
+        <a href="#testing-considerations">Testing Considerations</a>
+      </div>
+
+    </div>
+  </div>
+  <div id="sidebar-toggle"></div>
+  <div id="container">
+    <div class="docs markdown"><div class="pilwrap" id="claude.md">
+  <h1>
+    <a href="#claude.md" name="claude.md" class="pilcrow"></a>
+CLAUDE.md
+  </h1>
+</div>
+<p>This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.</p>
+<div class="pilwrap" id="project-overview">
+  <h2>
+    <a href="#project-overview" name="project-overview" class="pilcrow"></a>
+Project Overview
+  </h2>
+</div>
+<p>TimeCheck is a React-based web application for group scheduling coordination. Users can create events, share availability, and find optimal meeting times. The app is built with Create React App and uses Firebase for authentication and data storage.</p>
+<div class="pilwrap" id="core-features">
+  <h3>
+    <a href="#core-features" name="core-features" class="pilcrow"></a>
+Core Features
+  </h3>
+</div>
+<ul>
+<li><strong>Guest Mode</strong>: Users can participate without logging in (name-only)</li>
+<li><strong>Instant Participation</strong>: View group availability and mark times immediately</li>
+<li><strong>Calendar Integration</strong>: Google Calendar and Apple Calendar support</li>
+<li><strong>Fixed Schedule</strong>: Recurring weekly unavailable times (sleep, work)</li>
+<li><strong>Three Availability States</strong>: Available (default), Unavailable, If Needed</li>
+</ul>
+<div class="pilwrap" id="commands">
+  <h2>
+    <a href="#commands" name="commands" class="pilcrow"></a>
+Commands
+  </h2>
+</div>
+<div class="pilwrap" id="development">
+  <h3>
+    <a href="#development" name="development" class="pilcrow"></a>
+Development
+  </h3>
+</div>
+<pre><code class="bash">npm start          <span class="hljs-comment"># Run development server on localhost:3000</span>
+npm start:network  <span class="hljs-comment"># Run development server accessible on network</span>
+npm run build      <span class="hljs-comment"># Build for production to build folder</span>
+npm <span class="hljs-built_in">test</span>           <span class="hljs-comment"># Run tests in interactive watch mode</span>
+</code></pre>
+<div class="pilwrap" id="firebase-cloud-functions">
+  <h3>
+    <a href="#firebase-cloud-functions" name="firebase-cloud-functions" class="pilcrow"></a>
+Firebase Cloud Functions
+  </h3>
+</div>
+<pre><code class="bash"><span class="hljs-built_in">cd</span> <span class="hljs-built_in">functions</span>
+npm install        <span class="hljs-comment"># Install cloud function dependencies</span>
+npm run serve      <span class="hljs-comment"># Run functions locally with emulator</span>
+npm run shell      <span class="hljs-comment"># Interactive shell for testing functions</span>
+npm run deploy     <span class="hljs-comment"># Deploy functions to Firebase</span>
+</code></pre>
+<div class="pilwrap" id="deployment">
+  <h3>
+    <a href="#deployment" name="deployment" class="pilcrow"></a>
+Deployment
+  </h3>
+</div>
+<pre><code class="bash">npm run deploy:config     <span class="hljs-comment"># Deploy configuration</span>
+npm run deploy:production <span class="hljs-comment"># Build and deploy to Firebase Hosting</span>
+</code></pre>
+<div class="pilwrap" id="architecture">
+  <h2>
+    <a href="#architecture" name="architecture" class="pilcrow"></a>
+Architecture
+  </h2>
+</div>
+<div class="pilwrap" id="tech-stack">
+  <h3>
+    <a href="#tech-stack" name="tech-stack" class="pilcrow"></a>
+Tech Stack
+  </h3>
+</div>
+<ul>
+<li><strong>Frontend</strong>: React 19.1 with Material-UI (MUI) v7.2.0 components</li>
+<li><strong>Routing</strong>: React Router v7.6.3</li>
+<li><strong>Backend</strong>: Firebase v11.10.0 (Firestore database, Authentication, Cloud Functions)</li>
+<li><strong>Date/Time</strong>: Day.js v1.11.13 and date-fns v4.1.0</li>
+<li><strong>Calendar Integration</strong>:
+<ul>
+<li>Google Calendar API (@react-oauth/google v0.12.2)</li>
+<li>Apple Calendar (tsdav v2.1.5 for CalDAV)</li>
+</ul>
+</li>
+<li><strong>Build Tools</strong>: react-app-rewired v2.2.1 for webpack customization</li>
+<li><strong>Styling</strong>: MUI theme system with custom CSS</li>
+</ul>
+<div class="pilwrap" id="project-structure">
+  <h3>
+    <a href="#project-structure" name="project-structure" class="pilcrow"></a>
+Project Structure
+  </h3>
+</div>
+<pre><code>src/
+├── components/          # Reusable UI components
+│   ├── common/         # Shared schedule components (ScheduleCell, etc.)
+│   ├── FixedSchedule.js
+│   ├── GroupSchedule.js
+│   ├── MySchedule.js
+│   └── ParticipantsList.js
+├── config/             # Configuration files
+│   └── firebase.js     # Firebase initialization
+├── contexts/           # React Context providers
+│   ├── AuthContext.js  # Authentication state management
+│   └── GoogleOAuthContext.js
+├── hooks/              # Custom React hooks
+│   ├── useEventData.js # Core event data management
+│   └── useCalendarIntegration.js
+├── pages/              # Route-level components
+│   ├── HomePage.js     # Event creation
+│   ├── EventPage.js    # Event participation
+│   ├── MyEventsPage.js # User's events list
+│   └── SettingsPage.js # Calendar &amp; fixed schedule
+├── services/           # External service integrations
+│   ├── googleCalendar.js
+│   └── appleCalendar.js
+├── styles/             # CSS stylesheets
+│   └── schedule.css    # Optimized schedule styling
+└── utils/              # Utility functions
+    └── timeUtils.js    # Date/time helpers
+</code></pre>
+<div class="pilwrap" id="key-architectural-patterns">
+  <h3>
+    <a href="#key-architectural-patterns" name="key-architectural-patterns" class="pilcrow"></a>
+Key Architectural Patterns
+  </h3>
+</div>
+<ol>
+<li>
+<p><strong>Context-based State Management</strong></p>
+<ul>
+<li><code>AuthContext</code> manages authentication state (Firebase + Google OAuth + Guest mode)</li>
+<li><code>GoogleOAuthContext</code> handles Google OAuth flow</li>
+<li>Provides unified user state across the app</li>
+</ul>
+</li>
+<li>
+<p><strong>Custom Hook Pattern</strong></p>
+<ul>
+<li><code>useEventData</code> centralizes all event-related data fetching and state management</li>
+<li>Handles Firestore subscriptions, schedule updates, and event creation</li>
+<li>Supports both authenticated and guest users</li>
+<li>Manages real-time updates via Firestore listeners</li>
+</ul>
+</li>
+<li>
+<p><strong>Component Structure</strong></p>
+<ul>
+<li><strong>Layout</strong>: Wraps all pages with consistent navigation</li>
+<li><strong>Pages</strong> (<code>src/pages/</code>): Route-level components
+<ul>
+<li>HomePage: Event creation (login required)</li>
+<li>EventPage: Event participation (guest-friendly)</li>
+<li>MyEventsPage: User's created events (login required)</li>
+<li>SettingsPage: Calendar integration + fixed schedule (login required)</li>
+</ul>
+</li>
+<li><strong>Components</strong> (<code>src/components/</code>): Reusable UI components
+<ul>
+<li>MySchedule: Personal availability editor with drag selection</li>
+<li>GroupSchedule: Aggregated availability heatmap</li>
+<li>FixedSchedule: Weekly recurring schedule</li>
+<li>ParticipantsList: Event participants display</li>
+<li>common/ScheduleCell: Base cell component for all schedules</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Data Model</strong></p>
+<pre><code>events/{eventId}/
+  - title, startDate, endDate, ownerId, startTime, endTime
+  - createdAt, updatedAt
+  availabilities/{userId or guestId}/
+    - unavailable: string[] // &quot;YYYY-MM-DD-HH:mm&quot; format
+    - ifNeeded: string[]
+    - displayName, photoURL, userId
+    - isGuest: boolean
+    - updatedAt
+
+fixedSchedules/{userId}/
+  - schedule: string[] // &quot;Day-HH:mm&quot; format (e.g., &quot;Monday-09:00&quot;)
+  - updatedAt
+</code></pre>
+</li>
+<li>
+<p><strong>Firebase Configuration</strong></p>
+<ul>
+<li><strong>Database</strong>: Firestore database &quot;timecheck2&quot; in nam5 region</li>
+<li><strong>Functions</strong>: Node.js 18 runtime in asia-northeast3 region</li>
+<li><strong>Security Rules</strong>: Support guest participation without authentication</li>
+<li><strong>Emulator Support</strong>: Full local development with Firebase emulators</li>
+<li>Environment variables required in <code>.env.local</code> for Firebase config</li>
+</ul>
+</li>
+</ol>
+<div class="pilwrap" id="environment-setup">
+  <h2>
+    <a href="#environment-setup" name="environment-setup" class="pilcrow"></a>
+Environment Setup
+  </h2>
+</div>
+<p>Create <code>.env.local</code> with Firebase configuration:</p>
+<pre><code>REACT_APP_FIREBASE_API_KEY=
+REACT_APP_FIREBASE_AUTH_DOMAIN=
+REACT_APP_FIREBASE_PROJECT_ID=
+REACT_APP_FIREBASE_STORAGE_BUCKET=
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=
+REACT_APP_FIREBASE_APP_ID=
+REACT_APP_FIREBASE_MEASUREMENT_ID=
+</code></pre>
+<div class="pilwrap" id="key-features-implementation">
+  <h2>
+    <a href="#key-features-implementation" name="key-features-implementation" class="pilcrow"></a>
+Key Features Implementation
+  </h2>
+</div>
+<div class="pilwrap" id="authentication-and-access">
+  <h3>
+    <a href="#authentication-and-access" name="authentication-and-access" class="pilcrow"></a>
+Authentication &amp; Access
+  </h3>
+</div>
+<ul>
+<li><strong>Guest Mode</strong>: Name-only participation without account creation
+<ul>
+<li>Guest IDs: <code>guest_{name}_nopass</code></li>
+<li>Data persists across sessions with same name</li>
+<li>No authentication required for viewing/participating</li>
+</ul>
+</li>
+<li><strong>Google Sign-In</strong>: Full features with cross-device sync</li>
+<li><strong>Navigation</strong>: Sign-in button in top-right corner</li>
+</ul>
+<div class="pilwrap" id="availability-selection">
+  <h3>
+    <a href="#availability-selection" name="availability-selection" class="pilcrow"></a>
+Availability Selection
+  </h3>
+</div>
+<ul>
+<li><strong>Drag Selection</strong>: Rectangle selection like FixedSchedule
+<ul>
+<li>Mouse down → drag → release to select area</li>
+<li>Preview before applying changes</li>
+<li>Optimized CSS for performance (will-change, contain)</li>
+</ul>
+</li>
+<li><strong>Three States</strong>:
+<ul>
+<li>Available (blue) - default</li>
+<li>Unavailable (red)</li>
+<li>If Needed (yellow)</li>
+</ul>
+</li>
+<li><strong>Instant Access</strong>: Non-logged users can mark times immediately</li>
+</ul>
+<div class="pilwrap" id="calendar-integration">
+  <h3>
+    <a href="#calendar-integration" name="calendar-integration" class="pilcrow"></a>
+Calendar Integration
+  </h3>
+</div>
+<ul>
+<li><strong>Google Calendar</strong>: OAuth 2.0, imports busy times</li>
+<li><strong>Apple Calendar</strong>: App-specific password authentication via CalDAV</li>
+<li><strong>Guest Support</strong>: Calendar import available after initial save</li>
+<li><strong>UI</strong>: Buttons in My Availability header</li>
+<li><strong>Credential Storage</strong>: Encrypted in Cloud Functions</li>
+</ul>
+<div class="pilwrap" id="uiux-consistency">
+  <h3>
+    <a href="#uiux-consistency" name="uiux-consistency" class="pilcrow"></a>
+UI/UX Consistency
+  </h3>
+</div>
+<ul>
+<li><strong>Fixed Cell Sizes</strong>: 40px × 32px across all schedules</li>
+<li><strong>Unified Navigation</strong>: Same header on all pages via Layout component</li>
+<li><strong>Material-UI Theme</strong>: Custom theme with Inter font family</li>
+<li><strong>Page Layouts</strong>:
+<ul>
+<li>EventPage: 3-column (My Schedule | Participants | Group Schedule)</li>
+<li>SettingsPage: 2-column centered (Calendar Integration | Fixed Schedule)</li>
+</ul>
+</li>
+<li><strong>Performance</strong>: CSS optimizations for smooth drag interactions</li>
+</ul>
+<div class="pilwrap" id="fixed-schedule">
+  <h3>
+    <a href="#fixed-schedule" name="fixed-schedule" class="pilcrow"></a>
+Fixed Schedule
+  </h3>
+</div>
+<ul>
+<li><strong>Weekly Recurring</strong>: Set regular unavailable times</li>
+<li><strong>Auto-Apply</strong>: New events inherit fixed schedule</li>
+<li><strong>Visual Feedback</strong>: Grey cells for fixed times</li>
+<li><strong>Storage</strong>: Separate Firestore collection</li>
+</ul>
+<div class="pilwrap" id="build-configuration">
+  <h2>
+    <a href="#build-configuration" name="build-configuration" class="pilcrow"></a>
+Build Configuration
+  </h2>
+</div>
+<div class="pilwrap" id="webpack-customization-config-overrides.js">
+  <h3>
+    <a href="#webpack-customization-config-overrides.js" name="webpack-customization-config-overrides.js" class="pilcrow"></a>
+Webpack Customization (config-overrides.js)
+  </h3>
+</div>
+<ul>
+<li>Handles .mjs file imports</li>
+<li>Provides Node.js polyfills for browser environment</li>
+<li>Custom build step copies privacy-policy.html to build folder</li>
+</ul>
+<div class="pilwrap" id="firebase-deployment">
+  <h3>
+    <a href="#firebase-deployment" name="firebase-deployment" class="pilcrow"></a>
+Firebase Deployment
+  </h3>
+</div>
+<ul>
+<li><strong>Hosting</strong>: Single-page app configuration with clean URLs</li>
+<li><strong>Functions</strong>: Separate deployment to Cloud Functions</li>
+<li><strong>Security</strong>: Rate limiting on authentication attempts</li>
+<li><strong>Caching</strong>: Long cache for static assets, no cache for index.html</li>
+</ul>
+<div class="pilwrap" id="development-tips">
+  <h2>
+    <a href="#development-tips" name="development-tips" class="pilcrow"></a>
+Development Tips
+  </h2>
+</div>
+<div class="pilwrap" id="working-with-schedules">
+  <h3>
+    <a href="#working-with-schedules" name="working-with-schedules" class="pilcrow"></a>
+Working with Schedules
+  </h3>
+</div>
+<ul>
+<li>Schedule components share common ScheduleCell base component</li>
+<li>Time slots are 30-minute intervals (48 per day)</li>
+<li>Dates stored as &quot;YYYY-MM-DD-HH:mm&quot; strings for consistency</li>
+<li>Fixed schedules use &quot;Day-HH:mm&quot; format (e.g., &quot;Monday-09:00&quot;)</li>
+</ul>
+<div class="pilwrap" id="real-time-updates">
+  <h3>
+    <a href="#real-time-updates" name="real-time-updates" class="pilcrow"></a>
+Real-time Updates
+  </h3>
+</div>
+<ul>
+<li>useEventData hook manages all Firestore listeners</li>
+<li>Availability updates are debounced to reduce writes</li>
+<li>Guest data persists using localStorage name matching</li>
+</ul>
+<div class="pilwrap" id="testing-considerations">
+  <h3>
+    <a href="#testing-considerations" name="testing-considerations" class="pilcrow"></a>
+Testing Considerations
+  </h3>
+</div>
+<ul>
+<li>No existing tests - consider adding when modifying core functionality</li>
+<li>Firebase emulator available for local testing</li>
+<li>Test with both authenticated and guest users</li>
+<li>Verify drag selection performance with large date ranges</li>
+</ul>
+</div>
+  </div>
+</body>
+</html>

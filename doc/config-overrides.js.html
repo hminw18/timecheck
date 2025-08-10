@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>config-overrides.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="doc-style.css" />
+  <script src="doc-filelist.js"></script>
+  <script>
+    var relativeDir = "";
+    var thisFile = "config-overrides.js";
+    var defaultSidebar = true;
+  </script>
+  <script src="doc-script.js"></script>
+
+</head>
+<body>
+  <div id="sidebar_wrapper">
+    <div id="sidebar_switch">
+      <span class="tree">Files</span>
+      <span class="headings">Headings</span>
+    </div>
+    <div id="tree"></div>
+    <div id="headings">
+
+    </div>
+  </div>
+  <div id="sidebar-toggle"></div>
+  <div id="container">
+    <div class="background highlight"></div>
+<table cellpadding="0" cellspacing="0">
+  <tbody>
+    
+      <tr>
+        <td class="docs">
+          <h1>config-overrides.js</h1>
+        </td>
+        <td class="code highlight"></td>
+      </tr>
+    
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-1" id="section-1"></a>
+</div>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">const</span> webpack = <span class="hljs-built_in">require</span>(<span class="hljs-string">'webpack'</span>);
+
+<span class="hljs-built_in">module</span>.exports = <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">override</span>(<span class="hljs-params">config</span>) </span>{
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-2" id="section-2"></a>
+</div>
+<p>Handle .mjs files properly</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  config.module.rules.push({
+    <span class="hljs-attr">test</span>: <span class="hljs-regexp">/\.mjs$/</span>,
+    <span class="hljs-attr">include</span>: <span class="hljs-regexp">/node_modules/</span>,
+    <span class="hljs-attr">type</span>: <span class="hljs-string">'javascript/auto'</span>,
+    <span class="hljs-attr">resolve</span>: {
+      <span class="hljs-attr">fullySpecified</span>: <span class="hljs-literal">false</span>,
+    },
+  });
+  
+  config.resolve.fallback = {
+    ...config.resolve.fallback,
+    <span class="hljs-attr">buffer</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'buffer'</span>),
+    <span class="hljs-attr">process</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'process/browser'</span>),
+    <span class="hljs-attr">stream</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'stream-browserify'</span>),
+    <span class="hljs-attr">util</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'util'</span>),
+    <span class="hljs-attr">assert</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'assert'</span>),
+    <span class="hljs-attr">http</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'stream-http'</span>),
+    <span class="hljs-attr">https</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'https-browserify'</span>),
+    <span class="hljs-attr">os</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'os-browserify/browser'</span>),
+    <span class="hljs-attr">url</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'url'</span>),
+    <span class="hljs-attr">crypto</span>: <span class="hljs-built_in">require</span>.resolve(<span class="hljs-string">'crypto-browserify'</span>),
+  };
+
+  config.plugins = [
+    ...config.plugins,
+    <span class="hljs-keyword">new</span> webpack.ProvidePlugin({
+      <span class="hljs-attr">Buffer</span>: [<span class="hljs-string">'buffer'</span>, <span class="hljs-string">'Buffer'</span>],
+      <span class="hljs-attr">process</span>: <span class="hljs-string">'process/browser'</span>,
+    }),
+  ];
+
+  <span class="hljs-keyword">return</span> config;
+};
+</pre>
+        </td>
+      </tr>
+    
+  </tbody>
+</table>
+
+  </div>
+</body>
+</html>

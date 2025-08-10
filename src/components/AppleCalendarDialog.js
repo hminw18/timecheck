@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Box, TextField, Alert, Typography, Button, CircularProgress } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, Box, TextField, Alert, Typography, Button, CircularProgress, IconButton, Collapse } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const AppleCalendarDialog = ({ 
@@ -15,6 +17,9 @@ const AppleCalendarDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [tokenGenerated, setTokenGenerated] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [appleId, setAppleId] = useState('');
+  const [appPassword, setAppPassword] = useState('');
   
   // Generate CSRF token when dialog opens
   useEffect(() => {
@@ -126,106 +131,189 @@ const AppleCalendarDialog = ({
   };
   
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Apple Calendar 연동</DialogTitle>
-      <DialogContent>
-        <Box sx={{ pt: 2 }}>
-          {(error || externalError) && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error || externalError}
-            </Alert>
-          )}
-          
-          {isGeneratingToken ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <form 
-              onSubmit={handleSubmit}
-            >
-              <input type="hidden" name="csrfToken" value={csrfToken} />
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          m: 2
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        pb: 1
+      }}>
+        <Typography variant="h6" fontWeight={600}>
+          Apple Calendar 연동
+        </Typography>
+        <IconButton
+          onClick={onClose}
+          disabled={isSubmitting}
+          sx={{ 
+            color: 'text.secondary',
+            '&:hover': { backgroundColor: 'action.hover' }
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      
+      <DialogContent sx={{ pt: 2 }}>
+        {(error || externalError) && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error || externalError}
+          </Alert>
+        )}
+        
+        {isGeneratingToken ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <input type="hidden" name="csrfToken" value={csrfToken} />
+            
+            {/* Help Section */}
+            <Box sx={{ mb: 3 }}>
+              <Box 
+                sx={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  '&:hover': {
+                    '& .help-text': {
+                      textDecoration: 'underline'
+                    }
+                  }
+                }}
+                onClick={() => setShowHelp(!showHelp)}
+              >
+                <Typography 
+                  variant="body2" 
+                  className="help-text"
+                  sx={{ 
+                    color: 'primary.main',
+                    fontWeight: 500
+                  }}
+                >
+                  앱 암호
+                </Typography>
+                <HelpOutlineIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+              </Box>
               
+              <Collapse in={showHelp}>
+                <Box sx={{ 
+                  pl: 2, 
+                  py: 1, 
+                  bgcolor: 'grey.50',
+                  borderRadius: 1,
+                  borderLeft: '3px solid',
+                  borderLeftColor: 'primary.main'
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Apple Calendar 연동을 위해 앱 암호가 필요합니다:
+                  </Typography>
+                  <Box component="ol" sx={{ pl: 2, m: 0 }}>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      <a 
+                        href="https://appleid.apple.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: 'inherit', textDecoration: 'underline' }}
+                      >
+                        appleid.apple.com
+                      </a> 접속
+                    </Typography>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      "로그인 및 보안" → "앱 암호" 메뉴
+                    </Typography>
+                    <Typography component="li" variant="body2" color="text.secondary">
+                      "+" 버튼으로 새 앱 암호 생성
+                    </Typography>
+                  </Box>
+                </Box>
+              </Collapse>
+            </Box>
+
+            {/* Input Fields */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               <TextField
                 fullWidth
                 placeholder="Apple ID"
                 type="email"
                 name="appleId"
+                value={appleId}
+                onChange={(e) => setAppleId(e.target.value)}
                 required
                 disabled={externalLoading || !csrfToken || isSubmitting}
                 autoComplete="email"
-                inputProps={{
-                  autoComplete: "email"
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#64b5f6',
+                    }
+                  }
                 }}
-                sx={{ mb: 2 }}
               />
               
               <TextField
                 fullWidth
-                placeholder="앱 암호"
+                placeholder="앱 암호 (xxxx-xxxx-xxxx-xxxx)"
                 type="password"
                 name="appSpecificPassword"
+                value={appPassword}
+                onChange={(e) => setAppPassword(e.target.value)}
                 required
                 disabled={externalLoading || !csrfToken || isSubmitting}
                 autoComplete="off"
-                inputProps={{
-                  autoComplete: "off"
+                variant="outlined"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#64b5f6',
+                    }
+                  }
                 }}
-                sx={{ mb: 3 }}
               />
               
-              <Typography variant="body2" color="text.secondary">
-                <strong>앱 암호 생성 방법:</strong>
-              </Typography>
-              <Typography variant="body2" color="text.secondary" component="ol" sx={{ pl: 2, mt: 1 }}>
-                <li><a href="https://appleid.apple.com" target="_blank" rel="noopener noreferrer">appleid.apple.com</a> 접속</li>
-                <li>로그인 후 "로그인 및 보안" 메뉴로 이동</li>
-                <li>"앱 암호" 선택</li>
-                <li>"+" 버튼을 눌러 새 암호 생성</li>
-                <li>생성된 암호를 여기에 입력</li>
-              </Typography>
-              
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                <Button 
-                  type="button"
-                  onClick={onClose} 
-                  disabled={externalLoading || isSubmitting} 
-                  variant="outlined"
-                  sx={{ 
-                    textTransform: 'none',
-                    fontSize: '0.75rem',
-                    py: 0.25,
-                    px: 2,
-                    minHeight: 28,
-                    borderColor: 'divider',
-                    color: 'text.primary',
-                    '&:hover': {
-                      borderColor: 'text.secondary',
-                      backgroundColor: 'action.hover'
-                    }
-                  }}
-                >
-                  취소
-                </Button>
-                <Button 
-                  type="submit"
-                  variant="contained" 
-                  disabled={externalLoading || !csrfToken || isSubmitting} 
-                  disableElevation
-                  sx={{ 
-                    textTransform: 'none',
-                    fontSize: '0.75rem',
-                    py: 0.25,
-                    px: 2,
-                    minHeight: 28
-                  }}
-                >
-                  {externalLoading || isSubmitting ? '연결 중...' : '연결'}
-                </Button>
-              </Box>
-            </form>
-          )}
-        </Box>
+              <Button 
+                type="submit"
+                variant="contained" 
+                disabled={externalLoading || !csrfToken || isSubmitting || !appleId.trim() || !appPassword.trim()} 
+                sx={{ 
+                  py: 1.5,
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  boxShadow: '0 4px 12px rgba(100, 181, 246, 0.3)',
+                  '&:hover': {
+                    boxShadow: '0 6px 16px rgba(100, 181, 246, 0.4)',
+                  },
+                  '&:disabled': {
+                    boxShadow: 'none',
+                  }
+                }}
+              >
+                {externalLoading || isSubmitting ? (
+                  <>
+                    <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                    연결 중...
+                  </>
+                ) : (
+                  'Apple Calendar 연결'
+                )}
+              </Button>
+            </Box>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

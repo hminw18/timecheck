@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>package.json</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="doc-style.css" />
+  <script src="doc-filelist.js"></script>
+  <script>
+    var relativeDir = "";
+    var thisFile = "package.json";
+    var defaultSidebar = true;
+  </script>
+  <script src="doc-script.js"></script>
+
+</head>
+<body>
+  <div id="sidebar_wrapper">
+    <div id="sidebar_switch">
+      <span class="tree">Files</span>
+      <span class="headings">Headings</span>
+    </div>
+    <div id="tree"></div>
+    <div id="headings">
+
+    </div>
+  </div>
+  <div id="sidebar-toggle"></div>
+  <div id="container">
+    <div class="background highlight"></div>
+<table cellpadding="0" cellspacing="0">
+  <tbody>
+    
+      <tr>
+        <td class="docs">
+          <h1>package.json</h1>
+        </td>
+        <td class="code highlight"></td>
+      </tr>
+    
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-1" id="section-1"></a>
+</div>
+
+        </td>
+        <td class="code highlight">
+          <pre class="json">{
+  <span class="hljs-attr">"name"</span>: <span class="hljs-string">"timecheck"</span>,
+  <span class="hljs-attr">"version"</span>: <span class="hljs-string">"0.1.0"</span>,
+  <span class="hljs-attr">"private"</span>: <span class="hljs-literal">true</span>,
+  <span class="hljs-attr">"dependencies"</span>: {
+    <span class="hljs-attr">"@emotion/react"</span>: <span class="hljs-string">"^11.14.0"</span>,
+    <span class="hljs-attr">"@emotion/styled"</span>: <span class="hljs-string">"^11.14.1"</span>,
+    <span class="hljs-attr">"@mui/icons-material"</span>: <span class="hljs-string">"^7.2.0"</span>,
+    <span class="hljs-attr">"@mui/material"</span>: <span class="hljs-string">"^7.2.0"</span>,
+    <span class="hljs-attr">"@mui/x-date-pickers"</span>: <span class="hljs-string">"^8.7.0"</span>,
+    <span class="hljs-attr">"@mui/x-date-pickers-pro"</span>: <span class="hljs-string">"^8.8.0"</span>,
+    <span class="hljs-attr">"@react-oauth/google"</span>: <span class="hljs-string">"^0.12.2"</span>,
+    <span class="hljs-attr">"assert"</span>: <span class="hljs-string">"^2.1.0"</span>,
+    <span class="hljs-attr">"buffer"</span>: <span class="hljs-string">"^6.0.3"</span>,
+    <span class="hljs-attr">"crypto-browserify"</span>: <span class="hljs-string">"^3.12.1"</span>,
+    <span class="hljs-attr">"date-fns"</span>: <span class="hljs-string">"^4.1.0"</span>,
+    <span class="hljs-attr">"dayjs"</span>: <span class="hljs-string">"^1.11.13"</span>,
+    <span class="hljs-attr">"docker"</span>: <span class="hljs-string">"^1.0.0"</span>,
+    <span class="hljs-attr">"firebase"</span>: <span class="hljs-string">"^11.10.0"</span>,
+    <span class="hljs-attr">"https-browserify"</span>: <span class="hljs-string">"^1.0.0"</span>,
+    <span class="hljs-attr">"nth-check"</span>: <span class="hljs-string">"^2.1.1"</span>,
+    <span class="hljs-attr">"os-browserify"</span>: <span class="hljs-string">"^0.3.0"</span>,
+    <span class="hljs-attr">"process"</span>: <span class="hljs-string">"^0.11.10"</span>,
+    <span class="hljs-attr">"react"</span>: <span class="hljs-string">"^19.1.0"</span>,
+    <span class="hljs-attr">"react-app-rewired"</span>: <span class="hljs-string">"^2.2.1"</span>,
+    <span class="hljs-attr">"react-dom"</span>: <span class="hljs-string">"^19.1.0"</span>,
+    <span class="hljs-attr">"react-router-dom"</span>: <span class="hljs-string">"^7.6.3"</span>,
+    <span class="hljs-attr">"react-scripts"</span>: <span class="hljs-string">"^5.0.1"</span>,
+    <span class="hljs-attr">"stream-browserify"</span>: <span class="hljs-string">"^3.0.0"</span>,
+    <span class="hljs-attr">"stream-http"</span>: <span class="hljs-string">"^3.2.0"</span>,
+    <span class="hljs-attr">"tsdav"</span>: <span class="hljs-string">"^2.1.5"</span>,
+    <span class="hljs-attr">"url"</span>: <span class="hljs-string">"^0.11.4"</span>,
+    <span class="hljs-attr">"util"</span>: <span class="hljs-string">"^0.12.5"</span>
+  },
+  <span class="hljs-attr">"scripts"</span>: {
+    <span class="hljs-attr">"start"</span>: <span class="hljs-string">"react-app-rewired start"</span>,
+    <span class="hljs-attr">"start:network"</span>: <span class="hljs-string">"set HOST=0.0.0.0 &amp;&amp; react-app-rewired start"</span>,
+    <span class="hljs-attr">"build"</span>: <span class="hljs-string">"react-app-rewired build &amp;&amp; node -e \"require('fs').copyFileSync('public/privacy-policy.html', 'build/privacy-policy.html')\""</span>,
+    <span class="hljs-attr">"test"</span>: <span class="hljs-string">"react-app-rewired test"</span>,
+    <span class="hljs-attr">"eject"</span>: <span class="hljs-string">"react-scripts eject"</span>,
+    <span class="hljs-attr">"deploy:config"</span>: <span class="hljs-string">"node scripts/deploy-config.js"</span>,
+    <span class="hljs-attr">"deploy:production"</span>: <span class="hljs-string">"npm run build &amp;&amp; firebase deploy"</span>
+  },
+  <span class="hljs-attr">"eslintConfig"</span>: {
+    <span class="hljs-attr">"extends"</span>: [
+      <span class="hljs-string">"react-app"</span>,
+      <span class="hljs-string">"react-app/jest"</span>
+    ]
+  },
+  <span class="hljs-attr">"browserslist"</span>: {
+    <span class="hljs-attr">"production"</span>: [
+      <span class="hljs-string">"&gt;0.2%"</span>,
+      <span class="hljs-string">"not dead"</span>,
+      <span class="hljs-string">"not op_mini all"</span>
+    ],
+    <span class="hljs-attr">"development"</span>: [
+      <span class="hljs-string">"last 1 chrome version"</span>,
+      <span class="hljs-string">"last 1 firefox version"</span>,
+      <span class="hljs-string">"last 1 safari version"</span>
+    ]
+  },
+  <span class="hljs-attr">"devDependencies"</span>: {
+    <span class="hljs-attr">"autoprefixer"</span>: <span class="hljs-string">"^10.4.21"</span>,
+    <span class="hljs-attr">"postcss"</span>: <span class="hljs-string">"^8.5.6"</span>,
+    <span class="hljs-attr">"tailwindcss"</span>: <span class="hljs-string">"^4.1.11"</span>
+  }
+}
+
+</pre>
+        </td>
+      </tr>
+    
+  </tbody>
+</table>
+
+  </div>
+</body>
+</html>

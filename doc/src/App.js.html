@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>App.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="../doc-style.css" />
+  <script src="../doc-filelist.js"></script>
+  <script>
+    var relativeDir = "../";
+    var thisFile = "src\\App.js";
+    var defaultSidebar = true;
+  </script>
+  <script src="../doc-script.js"></script>
+
+</head>
+<body>
+  <div id="sidebar_wrapper">
+    <div id="sidebar_switch">
+      <span class="tree">Files</span>
+      <span class="headings">Headings</span>
+    </div>
+    <div id="tree"></div>
+    <div id="headings">
+
+    </div>
+  </div>
+  <div id="sidebar-toggle"></div>
+  <div id="container">
+    <div class="background highlight"></div>
+<table cellpadding="0" cellspacing="0">
+  <tbody>
+    
+      <tr>
+        <td class="docs">
+          <h1>App.js</h1>
+        </td>
+        <td class="code highlight"></td>
+      </tr>
+    
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-1" id="section-1"></a>
+</div>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript"><span class="hljs-keyword">import</span> React, { useState } <span class="hljs-keyword">from</span> <span class="hljs-string">'react'</span>;
+<span class="hljs-keyword">import</span> { Box, CircularProgress, Snackbar, Alert } <span class="hljs-keyword">from</span> <span class="hljs-string">'@mui/material'</span>;
+<span class="hljs-keyword">import</span> HomePage <span class="hljs-keyword">from</span> <span class="hljs-string">'./pages/HomePage'</span>;
+<span class="hljs-keyword">import</span> EventPage <span class="hljs-keyword">from</span> <span class="hljs-string">'./pages/EventPage'</span>;
+<span class="hljs-keyword">import</span> { useEventData } <span class="hljs-keyword">from</span> <span class="hljs-string">'./hooks/useEventData'</span>;
+<span class="hljs-keyword">import</span> { BrowserRouter <span class="hljs-keyword">as</span> Router, Routes, Route, useParams } <span class="hljs-keyword">from</span> <span class="hljs-string">'react-router-dom'</span>;
+<span class="hljs-keyword">import</span> { useAuth } <span class="hljs-keyword">from</span> <span class="hljs-string">'./contexts/AuthContext'</span>;
+<span class="hljs-keyword">import</span> { GoogleOAuthProvider } <span class="hljs-keyword">from</span> <span class="hljs-string">'./contexts/GoogleOAuthContext'</span>;
+<span class="hljs-keyword">import</span> MyEventsPage <span class="hljs-keyword">from</span> <span class="hljs-string">'./pages/MyEventsPage'</span>;
+<span class="hljs-keyword">import</span> SettingsPage <span class="hljs-keyword">from</span> <span class="hljs-string">'./pages/SettingsPage'</span>;
+<span class="hljs-keyword">import</span> PrivacyPolicyPage <span class="hljs-keyword">from</span> <span class="hljs-string">'./pages/PrivacyPolicyPage'</span>;
+<span class="hljs-keyword">import</span> Layout <span class="hljs-keyword">from</span> <span class="hljs-string">'./components/Layout'</span>;
+
+<span class="hljs-keyword">import</span> { ThemeProvider } <span class="hljs-keyword">from</span> <span class="hljs-string">'@mui/material/styles'</span>;
+<span class="hljs-keyword">import</span> theme <span class="hljs-keyword">from</span> <span class="hljs-string">'./config/theme'</span>;
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">EventPageWrapper</span>(<span class="hljs-params"></span>) </span>{
+  <span class="hljs-keyword">const</span> { user } = useAuth();
+  <span class="hljs-keyword">const</span> { eventId } = useParams();
+  <span class="hljs-keyword">const</span> {
+    isEventLoading,
+    eventDetails,
+    myUnavailableSchedule,
+    setMyUnavailableSchedule,
+    myIfNeededSchedule,
+    setMyIfNeededSchedule,
+    groupSchedule,
+    totalMembers,
+    respondedUsers,
+    availableWeeks,
+    handleSave,
+    fixedSchedule,
+  } = useEventData(eventId, user);
+
+  <span class="hljs-keyword">const</span> [snackbarOpen, setSnackbarOpen] = useState(<span class="hljs-literal">false</span>);
+
+  <span class="hljs-keyword">const</span> handleSaveWrapper = <span class="hljs-keyword">async</span> (guestUserData) =&gt; {
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-2" id="section-2"></a>
+</div>
+<p>If guestUserData is provided, pass it to handleSave</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">    <span class="hljs-keyword">const</span> success = guestUserData ? 
+      <span class="hljs-keyword">await</span> handleSave(guestUserData) : 
+      <span class="hljs-keyword">await</span> handleSave();
+    <span class="hljs-keyword">if</span> (success) {
+      setSnackbarOpen(<span class="hljs-literal">true</span>);
+    }
+  };
+
+  <span class="hljs-keyword">const</span> handleSnackbarClose = <span class="hljs-function">(<span class="hljs-params">event, reason</span>) =&gt;</span> {
+    <span class="hljs-keyword">if</span> (reason === <span class="hljs-string">'clickaway'</span>) {
+      <span class="hljs-keyword">return</span>;
+    }
+    setSnackbarOpen(<span class="hljs-literal">false</span>);
+  };
+
+  <span class="hljs-keyword">if</span> (isEventLoading || !eventDetails) {
+    <span class="hljs-keyword">return</span> (
+      <span class="xml"><span class="hljs-tag">&lt;<span class="hljs-name">Layout</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">Box</span> <span class="hljs-attr">sx</span>=<span class="hljs-string">{{</span> <span class="hljs-attr">display:</span> '<span class="hljs-attr">flex</span>', <span class="hljs-attr">justifyContent:</span> '<span class="hljs-attr">center</span>', <span class="hljs-attr">mt:</span> <span class="hljs-attr">5</span> }}&gt;</span><span class="hljs-tag">&lt;<span class="hljs-name">CircularProgress</span> /&gt;</span><span class="hljs-tag">&lt;/<span class="hljs-name">Box</span>&gt;</span>
+      <span class="hljs-tag">&lt;/<span class="hljs-name">Layout</span>&gt;</span></span>
+    );
+  }
+
+  <span class="hljs-keyword">return</span> (
+    <span class="xml"><span class="hljs-tag">&lt;<span class="hljs-name">Layout</span> <span class="hljs-attr">eventDetails</span>=<span class="hljs-string">{eventDetails}</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">EventPage</span>
+        <span class="hljs-attr">eventId</span>=<span class="hljs-string">{eventId}</span>
+        <span class="hljs-attr">eventDetails</span>=<span class="hljs-string">{eventDetails}</span>
+        <span class="hljs-attr">myUnavailableSchedule</span>=<span class="hljs-string">{myUnavailableSchedule}</span>
+        <span class="hljs-attr">setMyUnavailableSchedule</span>=<span class="hljs-string">{setMyUnavailableSchedule}</span>
+        <span class="hljs-attr">myIfNeededSchedule</span>=<span class="hljs-string">{myIfNeededSchedule}</span>
+        <span class="hljs-attr">setMyIfNeededSchedule</span>=<span class="hljs-string">{setMyIfNeededSchedule}</span>
+        <span class="hljs-attr">onSave</span>=<span class="hljs-string">{handleSaveWrapper}</span>
+        <span class="hljs-attr">groupSchedule</span>=<span class="hljs-string">{groupSchedule}</span>
+        <span class="hljs-attr">totalMembers</span>=<span class="hljs-string">{totalMembers}</span>
+        <span class="hljs-attr">availableWeeks</span>=<span class="hljs-string">{availableWeeks}</span>
+        <span class="hljs-attr">respondedUsers</span>=<span class="hljs-string">{respondedUsers}</span>
+        <span class="hljs-attr">fixedSchedule</span>=<span class="hljs-string">{fixedSchedule}</span>
+      /&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">Snackbar</span> 
+        <span class="hljs-attr">open</span>=<span class="hljs-string">{snackbarOpen}</span> 
+        <span class="hljs-attr">autoHideDuration</span>=<span class="hljs-string">{3000}</span> 
+        <span class="hljs-attr">onClose</span>=<span class="hljs-string">{handleSnackbarClose}</span>
+        <span class="hljs-attr">anchorOrigin</span>=<span class="hljs-string">{{</span> <span class="hljs-attr">vertical:</span> '<span class="hljs-attr">bottom</span>', <span class="hljs-attr">horizontal:</span> '<span class="hljs-attr">left</span>' }}
+        <span class="hljs-attr">sx</span>=<span class="hljs-string">{{</span> <span class="hljs-attr">bottom:</span> { <span class="hljs-attr">xs:</span> <span class="hljs-attr">16</span>, <span class="hljs-attr">sm:</span> <span class="hljs-attr">24</span> }, <span class="hljs-attr">left:</span> { <span class="hljs-attr">xs:</span> <span class="hljs-attr">16</span>, <span class="hljs-attr">sm:</span> <span class="hljs-attr">24</span> } }}
+      &gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">Alert</span> <span class="hljs-attr">onClose</span>=<span class="hljs-string">{handleSnackbarClose}</span> <span class="hljs-attr">severity</span>=<span class="hljs-string">"success"</span> <span class="hljs-attr">sx</span>=<span class="hljs-string">{{</span> <span class="hljs-attr">width:</span> '<span class="hljs-attr">100</span>%', <span class="hljs-attr">maxWidth:</span> <span class="hljs-attr">400</span> }}&gt;</span>
+          일정이 저장되었습니다!
+        <span class="hljs-tag">&lt;/<span class="hljs-name">Alert</span>&gt;</span>
+      <span class="hljs-tag">&lt;/<span class="hljs-name">Snackbar</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">Layout</span>&gt;</span></span>
+  );
+}
+
+<span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">HomePageWrapper</span>(<span class="hljs-params"></span>) </span>{
+  <span class="hljs-keyword">const</span> { user } = useAuth();
+  <span class="hljs-keyword">const</span> { handleCreateEvent } = useEventData(<span class="hljs-literal">null</span>, user);
+  
+  <span class="hljs-keyword">return</span> (
+    <span class="xml"><span class="hljs-tag">&lt;<span class="hljs-name">Layout</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">HomePage</span> <span class="hljs-attr">handleCreateEvent</span>=<span class="hljs-string">{handleCreateEvent}</span> /&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">Layout</span>&gt;</span></span>
+  );
+}
+
+<span class="hljs-keyword">export</span> <span class="hljs-keyword">default</span> <span class="hljs-function"><span class="hljs-keyword">function</span> <span class="hljs-title">App</span>(<span class="hljs-params"></span>) </span>{
+  <span class="hljs-keyword">return</span> (
+    <span class="xml"><span class="hljs-tag">&lt;<span class="hljs-name">ThemeProvider</span> <span class="hljs-attr">theme</span>=<span class="hljs-string">{theme}</span>&gt;</span>
+      <span class="hljs-tag">&lt;<span class="hljs-name">GoogleOAuthProvider</span>&gt;</span>
+        <span class="hljs-tag">&lt;<span class="hljs-name">Router</span>&gt;</span>
+          <span class="hljs-tag">&lt;<span class="hljs-name">Routes</span>&gt;</span>
+            <span class="hljs-tag">&lt;<span class="hljs-name">Route</span> <span class="hljs-attr">path</span>=<span class="hljs-string">"/"</span> <span class="hljs-attr">element</span>=<span class="hljs-string">{</span>&lt;<span class="hljs-attr">HomePageWrapper</span> /&gt;</span>} /&gt;
+            <span class="hljs-tag">&lt;<span class="hljs-name">Route</span> <span class="hljs-attr">path</span>=<span class="hljs-string">"/event/:eventId"</span> <span class="hljs-attr">element</span>=<span class="hljs-string">{</span>&lt;<span class="hljs-attr">EventPageWrapper</span> /&gt;</span>} /&gt;
+            <span class="hljs-tag">&lt;<span class="hljs-name">Route</span> <span class="hljs-attr">path</span>=<span class="hljs-string">"/my-events"</span> <span class="hljs-attr">element</span>=<span class="hljs-string">{</span>&lt;<span class="hljs-attr">MyEventsPage</span> /&gt;</span>} /&gt;
+            <span class="hljs-tag">&lt;<span class="hljs-name">Route</span> <span class="hljs-attr">path</span>=<span class="hljs-string">"/settings"</span> <span class="hljs-attr">element</span>=<span class="hljs-string">{</span>&lt;<span class="hljs-attr">SettingsPage</span> /&gt;</span>} /&gt;
+            <span class="hljs-tag">&lt;<span class="hljs-name">Route</span> <span class="hljs-attr">path</span>=<span class="hljs-string">"/privacy-policy"</span> <span class="hljs-attr">element</span>=<span class="hljs-string">{</span>&lt;<span class="hljs-attr">PrivacyPolicyPage</span> /&gt;</span>} /&gt;
+          <span class="hljs-tag">&lt;/<span class="hljs-name">Routes</span>&gt;</span>
+        <span class="hljs-tag">&lt;/<span class="hljs-name">Router</span>&gt;</span>
+      <span class="hljs-tag">&lt;/<span class="hljs-name">GoogleOAuthProvider</span>&gt;</span>
+    <span class="hljs-tag">&lt;/<span class="hljs-name">ThemeProvider</span>&gt;</span></span>
+  );
+}
+
+</pre>
+        </td>
+      </tr>
+    
+  </tbody>
+</table>
+
+  </div>
+</body>
+</html>

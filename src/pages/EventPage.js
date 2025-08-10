@@ -736,7 +736,8 @@ const EventPage = ({
                         onClick={handleAddCalendar} 
                         sx={{ 
                           p: 0.5,
-                          ml: 0.5
+                          ml: 0.5,
+                          borderRadius: 2
                         }}
                       >
                         <AddIcon sx={{ fontSize: 20 }} />

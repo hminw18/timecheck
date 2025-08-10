@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Table, TableBody, TableRow, TableCell, Typography, Button, ToggleButtonGroup, ToggleButton, Box, CircularProgress, TableContainer, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Table, TableBody, TableRow, TableCell, Typography, Button, ToggleButtonGroup, ToggleButton, Box, CircularProgress, TableContainer, Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import ScheduleTable from './common/ScheduleTable';
 import TimeColumn from './common/TimeColumn';
 import ScheduleHeader from './common/ScheduleHeader';
@@ -309,7 +310,8 @@ const MySchedule = ({
               fontSize: '0.75rem',
               py: 0.25,
               minHeight: 28,
-              textTransform: 'none'
+              textTransform: 'none',
+              borderRadius: 2
             }}
           >
             일정 연동
@@ -324,7 +326,8 @@ const MySchedule = ({
             fontSize: '0.75rem',
             py: 0.25,
             minHeight: 28,
-            textTransform: 'none'
+            textTransform: 'none',
+            borderRadius: 2
           }}
         >
           저장
@@ -978,14 +981,40 @@ const MySchedule = ({
         </Box>
       )}
       
-      <Dialog open={calendarDialogOpen} onClose={closeDialog} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ pb: 1.5 }}>일정 연동</DialogTitle>
-        <DialogContent sx={{ pt: 1.5, pb: 0.5 }}>
+      <Dialog 
+        open={calendarDialogOpen} 
+        onClose={closeDialog} 
+        fullWidth 
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            m: 2
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          pb: 1,
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between'
+        }}>
+          <Typography variant="h6" fontWeight={600}>
+            일정 연동
+          </Typography>
+          <IconButton
+            onClick={closeDialog}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { backgroundColor: 'action.hover' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
           {children}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 1 }}>
-          <Button onClick={closeDialog} size="small">닫기</Button>
-        </DialogActions>
       </Dialog>
     </Box>
   );

@@ -113,11 +113,14 @@ const SuggestionDialog = ({ open, onClose }) => {
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <Box>
+              <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary' }}>
+                피드백
+              </Typography>
               <TextField
                 multiline
                 rows={4}
                 fullWidth
-                placeholder="피드백은 정말 큰 도움이 됩니다"
+                placeholder="피드백은 정말 큰 도움이 됩니다."
                 value={suggestion}
                 onChange={(e) => setSuggestion(e.target.value)}
                 disabled={loading}
@@ -127,6 +130,9 @@ const SuggestionDialog = ({ open, onClose }) => {
                     '&.Mui-focused fieldset': {
                       borderColor: '#64b5f6',
                     }
+                  },
+                  '& .MuiInputBase-input': {
+                    fontSize: {xs: '0.8rem', sm: '1rem'}
                   }
                 }}
               />
@@ -138,17 +144,24 @@ const SuggestionDialog = ({ open, onClose }) => {
               </Typography>
               <TextField
                 fullWidth
-                placeholder="이메일을 남겨주시면 꼭 답장을 드리겠습니다"
+                placeholder="꼭 답장을 드리겠습니다."
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
                 variant="outlined"
                 type="email"
+                autoComplete="email"
+                inputProps={{
+                  autoComplete: "email"
+                }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     '&.Mui-focused fieldset': {
                       borderColor: '#64b5f6',
                     }
+                  },
+                  '& .MuiInputBase-input': {
+                    fontSize: { xs: '0.8rem', sm: '1rem' }
                   }
                 }}
               />
@@ -156,37 +169,34 @@ const SuggestionDialog = ({ open, onClose }) => {
           </Box>
         </DialogContent>
         
-        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1 }}>
-          <Button 
-            onClick={handleClose}
-            disabled={loading}
-            size="small"
-            sx={{ 
-              px: 2,
-              py: 0.25,
-              minHeight: 28,
-              textTransform: 'none',
-              color: 'text.secondary'
-            }}
-          >
-            취소
-          </Button>
+        <DialogActions sx={{ px: 3, pb: 3, pt: 2, display: 'flex', justifyContent: 'center' }}>
           <Button 
             onClick={handleSubmit}
             variant="contained"
-            size="small"
             disabled={loading || !suggestion.trim()}
             sx={{ 
-              px: 2,
-              py: 0.25,
-              minHeight: 28,
-              textTransform: 'none'
+              width: '100%',
+              height: 48,
+              borderRadius: 2,
+              textTransform: 'none',
+              fontSize: '1rem',
+              fontWeight: 600,
+              boxShadow: '0 4px 12px rgba(100, 181, 246, 0.3)',
+              '&:hover': {
+                boxShadow: '0 6px 16px rgba(100, 181, 246, 0.4)',
+              },
+              '&:disabled': {
+                boxShadow: 'none',
+              }
             }}
           >
             {loading ? (
-              <CircularProgress size={16} color="inherit" />
+              <>
+                <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                제출 중...
+              </>
             ) : (
-              '제출'
+              '피드백 제출하기'
             )}
           </Button>
         </DialogActions>

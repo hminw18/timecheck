@@ -132,10 +132,10 @@ const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false
     <Box>
 
       <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'flex' }}>
-        <Button variant="outlined" size="small" onClick={() => setSelectedCells(new Set())}>
+        <Button variant="outlined" size="small" onClick={() => setSelectedCells(new Set())} sx={{ borderRadius: 2 }}>
           초기화
         </Button>
-        <Button variant="contained" size="small" onClick={handleSave} disableElevation>
+        <Button variant="contained" size="small" onClick={handleSave} disableElevation sx={{ borderRadius: 2 }}>
           저장
         </Button>
       </Box>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>csp-config.js</title>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <link rel="stylesheet" media="all" href="../doc-style.css" />
+  <script src="../doc-filelist.js"></script>
+  <script>
+    var relativeDir = "../";
+    var thisFile = "build\\csp-config.js";
+    var defaultSidebar = true;
+  </script>
+  <script src="../doc-script.js"></script>
+
+</head>
+<body>
+  <div id="sidebar_wrapper">
+    <div id="sidebar_switch">
+      <span class="tree">Files</span>
+      <span class="headings">Headings</span>
+    </div>
+    <div id="tree"></div>
+    <div id="headings">
+
+    </div>
+  </div>
+  <div id="sidebar-toggle"></div>
+  <div id="container">
+    <div class="background highlight"></div>
+<table cellpadding="0" cellspacing="0">
+  <tbody>
+    
+      <tr>
+        <td class="docs">
+          <h1>csp-config.js</h1>
+        </td>
+        <td class="code highlight"></td>
+      </tr>
+    
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-1" id="section-1"></a>
+</div>
+<p>CSP Configuration - DEPRECATED
+CSP is now handled by Firebase hosting configuration in firebase.json
+This file is kept for backward compatibility but is no longer used</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">(<span class="hljs-function"><span class="hljs-keyword">function</span>(<span class="hljs-params"></span>) </span>{
+  <span class="hljs-keyword">return</span>; <span class="hljs-comment">// Early exit - CSP handled by firebase.json</span>
+  <span class="hljs-keyword">const</span> isDevelopment = <span class="hljs-built_in">window</span>.location.hostname === <span class="hljs-string">'localhost'</span> || 
+                       <span class="hljs-built_in">window</span>.location.hostname === <span class="hljs-string">'127.0.0.1'</span> || 
+                       <span class="hljs-built_in">window</span>.location.hostname.startsWith(<span class="hljs-string">'192.168.'</span>) ||
+                       <span class="hljs-built_in">window</span>.location.hostname.startsWith(<span class="hljs-string">'10.'</span>) ||
+                       <span class="hljs-built_in">window</span>.location.hostname.startsWith(<span class="hljs-string">'172.'</span>);
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-2" id="section-2"></a>
+</div>
+<p>Generate nonce for inline scripts</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> nonce = btoa(<span class="hljs-built_in">String</span>.fromCharCode(...crypto.getRandomValues(<span class="hljs-keyword">new</span> <span class="hljs-built_in">Uint8Array</span>(<span class="hljs-number">16</span>))));
+  <span class="hljs-built_in">window</span>.CSP_NONCE = nonce;
+  
+  <span class="hljs-keyword">const</span> cspConfig = {
+    <span class="hljs-attr">development</span>: {
+      <span class="hljs-string">'default-src'</span>: [<span class="hljs-string">"'self'"</span>],
+      <span class="hljs-string">'script-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"'unsafe-inline'"</span>, <span class="hljs-string">"'unsafe-eval'"</span>, <span class="hljs-string">"http://localhost:*"</span>, <span class="hljs-string">"https://apis.google.com"</span>, <span class="hljs-string">"https://accounts.google.com"</span>],
+      <span class="hljs-string">'style-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"'unsafe-inline'"</span>, <span class="hljs-string">"https://fonts.googleapis.com"</span>],
+      <span class="hljs-string">'font-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"https://fonts.gstatic.com"</span>],
+      <span class="hljs-string">'img-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"data:"</span>, <span class="hljs-string">"https://lh3.googleusercontent.com"</span>, <span class="hljs-string">"https://*.googleusercontent.com"</span>],
+      <span class="hljs-string">'connect-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"http://localhost:*"</span>, <span class="hljs-string">"https://identitytoolkit.googleapis.com"</span>, <span class="hljs-string">"https://securetoken.googleapis.com"</span>, <span class="hljs-string">"https://www.googleapis.com"</span>, <span class="hljs-string">"https://us-central1-timecheck-40840.cloudfunctions.net"</span>, <span class="hljs-string">"https://asia-northeast3-timecheck-40840.cloudfunctions.net"</span>, <span class="hljs-string">"https://firestore.googleapis.com"</span>, <span class="hljs-string">"https://oauth2.googleapis.com"</span>, <span class="hljs-string">"ws://localhost:*"</span>],
+      <span class="hljs-string">'frame-src'</span>: [<span class="hljs-string">"https://accounts.google.com"</span>, <span class="hljs-string">"http://localhost:*"</span>, <span class="hljs-string">"https://timecheck-40840.firebaseapp.com"</span>],
+      <span class="hljs-string">'object-src'</span>: [<span class="hljs-string">"'none'"</span>],
+      <span class="hljs-string">'base-uri'</span>: [<span class="hljs-string">"'self'"</span>],
+      <span class="hljs-string">'form-action'</span>: [<span class="hljs-string">"'self'"</span>]
+    },
+    <span class="hljs-attr">production</span>: {
+      <span class="hljs-string">'default-src'</span>: [<span class="hljs-string">"'self'"</span>],
+      <span class="hljs-string">'script-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">`'nonce-<span class="hljs-subst">${nonce}</span>'`</span>, <span class="hljs-string">"https://apis.google.com"</span>, <span class="hljs-string">"https://accounts.google.com"</span>],
+      <span class="hljs-string">'style-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"'unsafe-inline'"</span>, <span class="hljs-string">"https://fonts.googleapis.com"</span>], <span class="hljs-comment">// MUI requires unsafe-inline for styles</span>
+      <span class="hljs-string">'font-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"https://fonts.gstatic.com"</span>],
+      <span class="hljs-string">'img-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"data:"</span>, <span class="hljs-string">"https://lh3.googleusercontent.com"</span>, <span class="hljs-string">"https://*.googleusercontent.com"</span>],
+      <span class="hljs-string">'connect-src'</span>: [<span class="hljs-string">"'self'"</span>, <span class="hljs-string">"https://identitytoolkit.googleapis.com"</span>, <span class="hljs-string">"https://securetoken.googleapis.com"</span>, <span class="hljs-string">"https://www.googleapis.com"</span>, <span class="hljs-string">"https://us-central1-timecheck-40840.cloudfunctions.net"</span>, <span class="hljs-string">"https://asia-northeast3-timecheck-40840.cloudfunctions.net"</span>, <span class="hljs-string">"https://firestore.googleapis.com"</span>, <span class="hljs-string">"https://oauth2.googleapis.com"</span>],
+      <span class="hljs-string">'frame-src'</span>: [<span class="hljs-string">"https://accounts.google.com"</span>, <span class="hljs-string">"https://timecheck-40840.firebaseapp.com"</span>],
+      <span class="hljs-string">'object-src'</span>: [<span class="hljs-string">"'none'"</span>],
+      <span class="hljs-string">'base-uri'</span>: [<span class="hljs-string">"'self'"</span>],
+      <span class="hljs-string">'form-action'</span>: [<span class="hljs-string">"'self'"</span>],
+      <span class="hljs-string">'upgrade-insecure-requests'</span>: [<span class="hljs-string">""</span>]
+    }
+  };
+  
+  <span class="hljs-keyword">const</span> config = isDevelopment ? cspConfig.development : cspConfig.production;
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-3" id="section-3"></a>
+</div>
+<p>Build CSP string</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> cspString = <span class="hljs-built_in">Object</span>.entries(config)
+    .map(<span class="hljs-function">(<span class="hljs-params">[directive, sources]</span>) =&gt;</span> <span class="hljs-string">`<span class="hljs-subst">${directive}</span> <span class="hljs-subst">${sources.join(<span class="hljs-string">' '</span>)}</span>`</span>)
+    .join(<span class="hljs-string">'; '</span>);
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-4" id="section-4"></a>
+</div>
+<p>Apply CSP via meta tag</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> meta = <span class="hljs-built_in">document</span>.createElement(<span class="hljs-string">'meta'</span>);
+  meta.httpEquiv = <span class="hljs-string">'Content-Security-Policy'</span>;
+  meta.content = cspString;
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-5" id="section-5"></a>
+</div>
+<p>Remove existing CSP meta tag</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-keyword">const</span> existingCSP = <span class="hljs-built_in">document</span>.querySelector(<span class="hljs-string">'meta[http-equiv="Content-Security-Policy"]'</span>);
+  <span class="hljs-keyword">if</span> (existingCSP) {
+    existingCSP.remove();
+  }
+  
+</pre>
+        </td>
+      </tr>
+    
+      <tr>
+        <td class="docs">
+          <div class="pilwrap">
+  <a class="pilcrow" href="#section-6" id="section-6"></a>
+</div>
+<p>Add new CSP</p>
+
+        </td>
+        <td class="code highlight">
+          <pre class="javascript">  <span class="hljs-built_in">document</span>.head.appendChild(meta);
+})();
+</pre>
+        </td>
+      </tr>
+    
+  </tbody>
+</table>
+
+  </div>
+</body>
+</html>
