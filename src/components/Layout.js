@@ -196,7 +196,7 @@ const Layout = ({ children, eventDetails }) => {
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'flex-start',
-          alignItems: 'center',
+          alignItems: 'baseline',
           gap: 2
         }}>
           <Typography 
@@ -208,11 +208,10 @@ const Layout = ({ children, eventDetails }) => {
           >
             © 2025 TimeCheck
           </Typography>
-          <a 
-            href="/privacy-policy" 
+          <Link 
+            to="/privacy-policy" 
             style={{ 
-              textDecoration: 'none',
-              color: 'inherit'
+              textDecoration: 'none'
             }}
           >
             <Typography 
@@ -227,7 +226,7 @@ const Layout = ({ children, eventDetails }) => {
             >
               개인정보처리방침
             </Typography>
-          </a>
+          </Link>
           <Typography 
             variant="caption" 
             onClick={() => setSuggestionDialogOpen(true)}
