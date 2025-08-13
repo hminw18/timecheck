@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableRow, Typography, Tooltip, Box, ToggleButton, ToggleButtonGroup, useMediaQuery, Button, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControlLabel, Checkbox } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableRow, Typography, Tooltip, Box, ToggleButton, ToggleButtonGroup, useMediaQuery, Button, Menu, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, TextField, FormControlLabel, Checkbox, CircularProgress, IconButton, Chip } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { blue, green } from '@mui/material/colors';
-import { EditCalendar as EditCalendarIcon } from '@mui/icons-material';
+import { Close as CloseIcon, CheckCircle as CheckCircleIcon, Google as GoogleIcon, Apple as AppleIcon } from '@mui/icons-material';
 import MostAvailableTimes from './MostAvailableTimes';
 import ScheduleTable from './common/ScheduleTable';
 import TimeColumn from './common/TimeColumn';
@@ -12,17 +13,21 @@ import { buildCoordinatesCache } from '../utils/coordinateUtils';
 import googleCalendarService from '../services/googleCalendarService';
 import appleCalendarService from '../services/appleCalendarService';
 import { useAuth } from '../contexts/AuthContext';
+import { useGoogleOAuth } from '../contexts/GoogleOAuthContext';
+import { useCalendarIntegration } from '../hooks/useCalendarIntegration';
+import LoginDialog from './LoginDialog';
+import CalendarSelectionDialog from './CalendarSelectionDialog';
+import AppleCalendarDialog from './AppleCalendarDialog';
+import Toast from './Toast';
 
 const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule, totalMembers, respondedUsers, isStackMode = false }) => {
+  const { t } = useTranslation();
   const [excludeIfNeeded, setExcludeIfNeeded] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState(new Set());
   const [highlightBestTimes, setHighlightBestTimes] = useState(false);
   
   // Calendar write states
   const [writeMode, setWriteMode] = useState(false);
-  const [selectedCells, setSelectedCells] = useState(new Set());
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState(null);
   
   // Calendar dropdown menu
   const [calendarMenuAnchor, setCalendarMenuAnchor] = useState(null);
@@ -34,7 +39,22 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
   const [selectedCalendarType, setSelectedCalendarType] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   
+  // Toast for notifications
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
+  
+  // Dialog states for login and calendar connection
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [calendarSelectionDialogOpen, setCalendarSelectionDialogOpen] = useState(false);
+  const [appleDialogOpen, setAppleDialogOpen] = useState(false);
+  
   const { user } = useAuth();
+  const { isConnected: googleConnected, googleUser, connect: connectGoogle } = useGoogleOAuth();
+  const { appleCalendarConnected, appleCalendarUser, handleAppleCalendarConnect } = useCalendarIntegration();
+  
   const isMobile = useMediaQuery(`(max-width:${MOBILE_BREAKPOINT}px)`);
   const saveButtonRef = useRef(null);
   const cellStyle = getCellStyle(isMobile);
@@ -144,7 +164,7 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
   const getCellInfo = (slotId) => {
     const cellData = getCellData.get(slotId) || { displayCount: 0, sx: { backgroundColor: 'transparent', textAlign: 'center', color: 'inherit', fontWeight: 'bold' }, tooltipTitle: '' };
     
-    // In write mode, override style for selected cells
+    // In write mode, check if this cell is selected
     if (writeMode && selectedCells.has(slotId)) {
       return {
         ...cellData,
@@ -166,76 +186,159 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
     return availableWeeks.flatMap(week => getDaysForWeek(week));
   }, [availableWeeks, eventDetails.eventType]);
 
-  // Simple drag handlers for GroupSchedule
-  const handleMouseDown = useCallback((slotId, event) => {
+  // Build coordinates cache for drag selection
+  const coordinatesCache = useMemo(() => {
+    return buildCoordinatesCache(allDates, allTimeSlots);
+  }, [allDates, allTimeSlots]);
+
+  // Calendar write selection state
+  const [selectedCells, setSelectedCells] = useState(new Set());
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(null);
+  const dragStateRef = useRef({ 
+    isDragging: false, 
+    start: null, 
+    initialSelection: new Set(), // Store selection before drag
+    mode: null // 'add' or 'remove'
+  });
+
+  // Handle initial mouse/touch down
+  const handlePointerDown = useCallback((e) => {
     if (!writeMode) return;
     
-    event.preventDefault();
+    const cell = e.target.closest('[data-slot-id]');
+    if (!cell) return;
+    
+    const slotId = cell.getAttribute('data-slot-id');
+    if (!slotId) return;
+    
+    e.preventDefault();
+    e.stopPropagation(); // Prevent event from reaching MySchedule
+    
+    // Determine if we're adding or removing based on whether the start cell is already selected
+    const isStartSelected = selectedCells.has(slotId);
+    const mode = isStartSelected ? 'remove' : 'add';
+    
+    // Store the current selection state before starting drag
+    dragStateRef.current = { 
+      isDragging: true, 
+      start: slotId,
+      initialSelection: new Set(selectedCells), // Backup current selection
+      mode: mode,
+      currentSelection: new Set() // Track current drag selection separately
+    };
+    
     setIsDragging(true);
     setDragStart(slotId);
     
-    // Add to selection immediately
-    setSelectedCells(prev => {
-      const newSet = new Set(prev);
-      newSet.add(slotId);
-      return newSet;
-    });
-  }, [writeMode]);
+    // Don't modify selection yet, just mark the start
+  }, [writeMode, selectedCells]);
 
-  const handleMouseEnter = useCallback((slotId) => {
-    if (!writeMode || !isDragging || !dragStart) return;
-    
-    // Calculate rectangular selection
-    const selectedArea = getRectangularSelection(dragStart, slotId);
-    setSelectedCells(prev => {
-      const newSet = new Set(prev);
-      selectedArea.forEach(slot => newSet.add(slot));
-      return newSet;
-    });
-  }, [writeMode, isDragging, dragStart]);
+  // Remove old mouse over handler since we'll use global listeners
+  const handlePointerMove = useCallback((e) => {
+    // This will be handled by global listener
+  }, []);
 
-  const handleMouseUp = useCallback(() => {
-    if (!writeMode || !isDragging) return;
-    
-    setIsDragging(false);
-    setDragStart(null);
-  }, [writeMode, isDragging]);
+  const handlePointerUp = useCallback((e) => {
+    // This will be handled by global listener
+  }, []);
 
-  const getRectangularSelection = useCallback((start, end) => {
-    const selection = [];
-    
-    // Parse slot IDs to get coordinates
-    const parseSlotId = (slotId) => {
-      const parts = slotId.split('-');
-      const timeStr = parts[parts.length - 1];
-      const dayOrDate = parts.slice(0, -1).join('-');
+  const handlePointerCancel = handlePointerUp;
+
+  // Add global event listeners when dragging
+  useEffect(() => {
+    if (!isDragging || !dragStateRef.current.isDragging) return;
+
+    const updateSelection = (currentSlotId) => {
+      const startSlotId = dragStateRef.current.start;
+      if (!startSlotId || !currentSlotId) return;
       
-      const [hour, minute] = timeStr.split(':').map(Number);
-      const timeIndex = allTimeSlots.findIndex(slot => slot === timeStr);
-      const dayIndex = allDates.findIndex(date => date === dayOrDate);
+      // Get rectangular selection area
+      const startCoords = coordinatesCache.get(startSlotId);
+      const currentCoords = coordinatesCache.get(currentSlotId);
       
-      return { dayIndex, timeIndex, dayOrDate };
-    };
-    
-    const startCoord = parseSlotId(start);
-    const endCoord = parseSlotId(end);
-    
-    const minDay = Math.min(startCoord.dayIndex, endCoord.dayIndex);
-    const maxDay = Math.max(startCoord.dayIndex, endCoord.dayIndex);
-    const minTime = Math.min(startCoord.timeIndex, endCoord.timeIndex);
-    const maxTime = Math.max(startCoord.timeIndex, endCoord.timeIndex);
-    
-    for (let dayIdx = minDay; dayIdx <= maxDay; dayIdx++) {
-      for (let timeIdx = minTime; timeIdx <= maxTime; timeIdx++) {
-        if (allDates[dayIdx] && allTimeSlots[timeIdx]) {
-          const slotId = `${allDates[dayIdx]}-${allTimeSlots[timeIdx]}`;
-          selection.push(slotId);
+      if (!startCoords || !currentCoords) return;
+      
+      const minDate = Math.min(startCoords.dateIndex, currentCoords.dateIndex);
+      const maxDate = Math.max(startCoords.dateIndex, currentCoords.dateIndex);
+      const minHour = Math.min(startCoords.hourIndex, currentCoords.hourIndex);
+      const maxHour = Math.max(startCoords.hourIndex, currentCoords.hourIndex);
+      
+      // Build the cells in the current drag rectangle
+      const dragRectCells = new Set();
+      for (let dateIndex = minDate; dateIndex <= maxDate; dateIndex++) {
+        for (let hourIndex = minHour; hourIndex <= maxHour; hourIndex++) {
+          if (allDates[dateIndex] && allTimeSlots[hourIndex]) {
+            dragRectCells.add(`${allDates[dateIndex]}-${allTimeSlots[hourIndex]}`);
+          }
         }
       }
-    }
-    
-    return selection;
-  }, [allDates, allTimeSlots]);
+      
+      // Store current drag selection for comparison
+      dragStateRef.current.currentSelection = dragRectCells;
+      
+      // Start with the initial selection (before drag started)
+      const newSelection = new Set(dragStateRef.current.initialSelection);
+      
+      // Apply the drag operation (add or remove) to cells in the rectangle
+      if (dragStateRef.current.mode === 'add') {
+        dragRectCells.forEach(cellId => newSelection.add(cellId));
+      } else {
+        dragRectCells.forEach(cellId => newSelection.delete(cellId));
+      }
+      
+      setSelectedCells(newSelection);
+    };
+
+    const handleGlobalPointerMove = (e) => {
+      if (!dragStateRef.current.isDragging) return;
+      
+      let targetElement;
+      
+      // For touch events, use the touch point
+      if (e.pointerType === 'touch') {
+        targetElement = document.elementFromPoint(e.clientX, e.clientY);
+      } else {
+        // For mouse events, use the target
+        targetElement = e.target;
+      }
+      
+      const cell = targetElement?.closest('[data-slot-id]');
+      if (!cell) return;
+      
+      const currentSlotId = cell.getAttribute('data-slot-id');
+      if (currentSlotId) {
+        updateSelection(currentSlotId);
+      }
+    };
+
+    const handleGlobalPointerUp = () => {
+      dragStateRef.current = { 
+        isDragging: false, 
+        start: null, 
+        initialSelection: new Set(),
+        mode: null,
+        currentSelection: new Set()
+      };
+      setIsDragging(false);
+      setDragStart(null);
+    };
+
+    // Use pointer events for unified handling
+    document.addEventListener('pointermove', handleGlobalPointerMove);
+    document.addEventListener('pointerup', handleGlobalPointerUp);
+    document.addEventListener('pointercancel', handleGlobalPointerUp);
+
+    return () => {
+      document.removeEventListener('pointermove', handleGlobalPointerMove);
+      document.removeEventListener('pointerup', handleGlobalPointerUp);
+      document.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+  }, [isDragging, coordinatesCache, allDates, allTimeSlots]);
+
+
+
+
 
   const toggleParticipant = (userId) => {
     setSelectedParticipants(prev => {
@@ -252,6 +355,18 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
 
   // Calendar write mode handlers
   const handleWriteMode = () => {
+    // Check if user is logged in
+    if (!user) {
+      setLoginDialogOpen(true);
+      return;
+    }
+
+    // Check if any calendar is connected
+    if (!googleConnected && !appleCalendarConnected) {
+      setCalendarSelectionDialogOpen(true);
+      return;
+    }
+
     setWriteMode(true);
     setSelectedCells(new Set());
   };
@@ -284,6 +399,71 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
     setEventDialog(true);
   };
 
+  // Helper function to format time slots for display
+  const formatSelectedTimeSlots = () => {
+    const slots = Array.from(selectedCells);
+    if (slots.length === 0) return '';
+    
+    // Group by date/day and format time ranges
+    const groupedSlots = {};
+    slots.forEach(slot => {
+      const parts = slot.split('-');
+      const timeStr = parts[parts.length - 1];
+      const dayOrDate = parts.slice(0, -1).join('-');
+      
+      if (!groupedSlots[dayOrDate]) {
+        groupedSlots[dayOrDate] = [];
+      }
+      groupedSlots[dayOrDate].push(timeStr);
+    });
+    
+    const formatTimeRange = (times) => {
+      times.sort();
+      const ranges = [];
+      let start = times[0];
+      let end = times[0];
+      
+      for (let i = 1; i < times.length; i++) {
+        const prevTime = times[i - 1];
+        const currTime = times[i];
+        
+        // Check if times are consecutive (30min intervals)
+        const prevMinutes = parseInt(prevTime.split(':')[0]) * 60 + parseInt(prevTime.split(':')[1]);
+        const currMinutes = parseInt(currTime.split(':')[0]) * 60 + parseInt(currTime.split(':')[1]);
+        
+        if (currMinutes - prevMinutes === 30) {
+          end = currTime;
+        } else {
+          // Add range and start new one
+          const endMinutes = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]) + 30;
+          const endHour = Math.floor(endMinutes / 60);
+          const endMin = endMinutes % 60;
+          const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+          
+          ranges.push(`${start}-${endTimeStr}`);
+          start = currTime;
+          end = currTime;
+        }
+      }
+      
+      // Add final range
+      const endMinutes = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]) + 30;
+      const endHour = Math.floor(endMinutes / 60);
+      const endMin = endMinutes % 60;
+      const endTimeStr = `${endHour.toString().padStart(2, '0')}:${endMin.toString().padStart(2, '0')}`;
+      
+      ranges.push(`${start}-${endTimeStr}`);
+      return ranges.join(', ');
+    };
+    
+    const formattedDays = Object.entries(groupedSlots).map(([day, times]) => {
+      const timeRanges = formatTimeRange(times);
+      return `${day}: ${timeRanges}`;
+    });
+    
+    return formattedDays.join('\n');
+  };
+
   const handleCreateEvent = async () => {
     if (!eventTitle.trim() || !user) return;
     
@@ -301,11 +481,19 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
         );
         
         if (result.success) {
-          alert(`Google Calendar에 ${result.eventsCreated}개의 일정이 생성되었습니다.`);
+          showToast(`Google Calendar ${result.eventsCreated}${t('event.eventsCreated')}`, 'success');
         }
       } else if (selectedCalendarType === 'apple') {
-        // TODO: Implement Apple Calendar event creation
-        alert('Apple Calendar 이벤트 생성은 아직 구현되지 않았습니다.');
+        const result = await appleCalendarService.createEvent(
+          eventTitle,
+          timeSlots,
+          eventDetails.eventType,
+          eventDetails.selectedDays
+        );
+        
+        if (result.success) {
+          showToast(`Apple Calendar ${result.eventsCreated}${t('event.eventsCreated')}`, 'success');
+        }
       }
       
       // Reset states
@@ -317,7 +505,7 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
       
     } catch (error) {
       console.error('Error creating calendar event:', error);
-      alert('캘린더 이벤트 생성 중 오류가 발생했습니다: ' + (error.message || 'Unknown error'));
+      showToast(t('event.calendarEventError') + ' ' + (error.message || 'Unknown error'), 'error');
     } finally {
       setIsCreating(false);
     }
@@ -325,7 +513,7 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
 
   const Participants = () => (
     <Box>
-      <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>참여자</Typography>
+      <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>{t('event.participants')}</Typography>
       {respondedUsers && respondedUsers.size > 0 ? (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
           {Array.from(respondedUsers.values()).map((user) => {
@@ -355,54 +543,16 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
             );
           })}
         </Box>
-      ) : <Typography variant="body2" color="text.secondary">아직 참여자가 없습니다.</Typography>}
+      ) : <Typography variant="body2" color="text.secondary">{t('event.noParticipants')}</Typography>}
     </Box>
   );
 
-  const CalendarWriteSection = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-      <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>캘린더에 저장</Typography>
-      {!writeMode ? (
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<EditCalendarIcon />}
-          onClick={handleWriteMode}
-          fullWidth
-          sx={{ fontSize: '0.75rem' }}
-        >
-          캘린더에 쓰기
-        </Button>
-      ) : (
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            ref={saveButtonRef}
-            variant="contained"
-            size="small"
-            onClick={handleSaveSelection}
-            disabled={selectedCells.size === 0}
-            sx={{ fontSize: '0.75rem', flex: 1 }}
-          >
-            저장
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleCancelWrite}
-            sx={{ fontSize: '0.75rem', flex: 1 }}
-          >
-            취소
-          </Button>
-        </Box>
-      )}
-    </Box>
-  );
 
   const MostAvailable = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
       <MostAvailableTimes groupSchedule={groupSchedule} totalMembers={totalMembers} allDates={allDates} hours={hours} excludeIfNeeded={excludeIfNeeded} eventDetails={eventDetails} />
       <ToggleButtonGroup value={highlightBestTimes} exclusive onChange={(e, newValue) => setHighlightBestTimes(newValue)} aria-label="highlight best times" size="small" fullWidth>
-        <ToggleButton value={true} aria-label="highlight best" sx={{ fontSize: '0.75rem', py: 0.5 }}>최적 시간만 보기</ToggleButton>
+        <ToggleButton value={true} aria-label="highlight best" sx={{ fontSize: '0.75rem', py: 0.5 }}>{t('event.bestTimesOnly')}</ToggleButton>
       </ToggleButtonGroup>
     </Box>
   );
@@ -410,8 +560,18 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
   const Schedule = () => {
     const content = (
       <Box 
-        sx={{ display: 'flex' }}
-        onMouseUp={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onPointerLeave={handlePointerUp}
+        sx={{ 
+          display: 'flex',
+          touchAction: writeMode ? 'none' : 'auto', // Disable browser touch handling when in write mode
+          WebkitTouchCallout: 'none', // Disable iOS callout
+          WebkitUserSelect: 'none', // Disable text selection
+          userSelect: 'none'
+        }}
       >
         <TimeColumn hours={hours} isMobile={isMobile} />
         {eventDetails.eventType === 'day' ? (
@@ -485,10 +645,9 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
                               }}
                             >
                               {/* Upper half - :00 */}
-                              <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo00.tooltipTitle}</span>} disableHoverListener={!cellInfo00.tooltipTitle}>
+                              <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo00.tooltipTitle}</span>} disableHoverListener={!cellInfo00.tooltipTitle || writeMode}>
                                 <Box
-                                  onMouseDown={(e) => handleMouseDown(slot00, e)}
-                                  onMouseEnter={() => handleMouseEnter(slot00)}
+                                  data-slot-id={slot00}
                                   sx={{
                                     position: 'absolute',
                                     top: 0,
@@ -502,16 +661,18 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
                                     justifyContent: 'center',
                                     fontSize: '0.75rem',
                                     cursor: writeMode ? 'crosshair' : 'default',
-                                    userSelect: 'none'
+                                    userSelect: 'none',
+                                    touchAction: writeMode ? 'none' : 'auto',
+                                    WebkitTouchCallout: 'none',
+                                    WebkitUserSelect: 'none'
                                   }}
                                 >
                                 </Box>
                               </Tooltip>
                               {/* Lower half - :30 */}
-                              <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo30.tooltipTitle}</span>} disableHoverListener={!cellInfo30.tooltipTitle}>
+                              <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo30.tooltipTitle}</span>} disableHoverListener={!cellInfo30.tooltipTitle || writeMode}>
                                 <Box
-                                  onMouseDown={(e) => handleMouseDown(slot30, e)}
-                                  onMouseEnter={() => handleMouseEnter(slot30)}
+                                  data-slot-id={slot30}
                                   sx={{
                                     position: 'absolute',
                                     bottom: 0,
@@ -525,7 +686,10 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
                                     justifyContent: 'center',
                                     fontSize: '0.75rem',
                                     cursor: writeMode ? 'crosshair' : 'default',
-                                    userSelect: 'none'
+                                    userSelect: 'none',
+                                    touchAction: writeMode ? 'none' : 'auto',
+                                    WebkitTouchCallout: 'none',
+                                    WebkitUserSelect: 'none'
                                   }}
                                 >
                                 </Box>
@@ -615,11 +779,10 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
                                   }}
                                 >
                                   {/* Upper half - :00 */}
-                                  <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo00.tooltipTitle}</span>} disableHoverListener={!cellInfo00.tooltipTitle}>
+                                  <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo00.tooltipTitle}</span>} disableHoverListener={!cellInfo00.tooltipTitle || writeMode}>
                                     <Box
-                                      onMouseDown={(e) => handleMouseDown(slot00, e)}
-                                      onMouseEnter={() => handleMouseEnter(slot00)}
-                                      sx={{
+                                      data-slot-id={slot00}
+                                          sx={{
                                         position: 'absolute',
                                         top: 0,
                                         left: 0,
@@ -632,17 +795,19 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
                                         justifyContent: 'center',
                                         fontSize: '0.75rem',
                                         cursor: writeMode ? 'crosshair' : 'default',
-                                        userSelect: 'none'
+                                        userSelect: 'none',
+                                        touchAction: writeMode ? 'none' : 'auto',
+                                        WebkitTouchCallout: 'none',
+                                        WebkitUserSelect: 'none'
                                       }}
                                     >
                                         </Box>
                                   </Tooltip>
                                   {/* Lower half - :30 */}
-                                  <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo30.tooltipTitle}</span>} disableHoverListener={!cellInfo30.tooltipTitle}>
+                                  <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{cellInfo30.tooltipTitle}</span>} disableHoverListener={!cellInfo30.tooltipTitle || writeMode}>
                                     <Box
-                                      onMouseDown={(e) => handleMouseDown(slot30, e)}
-                                      onMouseEnter={() => handleMouseEnter(slot30)}
-                                      sx={{
+                                      data-slot-id={slot30}
+                                          sx={{
                                         position: 'absolute',
                                         bottom: 0,
                                         left: 0,
@@ -655,7 +820,10 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
                                         justifyContent: 'center',
                                         fontSize: '0.75rem',
                                         cursor: writeMode ? 'crosshair' : 'default',
-                                        userSelect: 'none'
+                                        userSelect: 'none',
+                                        touchAction: writeMode ? 'none' : 'auto',
+                                        WebkitTouchCallout: 'none',
+                                        WebkitUserSelect: 'none'
                                       }}
                                     >
                                         </Box>
@@ -696,11 +864,63 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', mb: 2, gap: 2, px: isMobile ? 2 : 0 }}>
+        <Typography variant="h6">{t('event.groupSchedule')}</Typography>
+        
+        {/* Calendar Write Button next to title */}
+        {!writeMode ? (
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleWriteMode}
+            sx={{
+              fontSize: '0.75rem',
+              minWidth: 'auto',
+              py: 0.25,
+              minHeight: 28,
+              textTransform: 'none',
+              borderRadius: 2
+            }}
+          >
+            {t('event.writeToCalendar')}
+          </Button>
+        ) : (
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              ref={saveButtonRef}
+              variant="contained"
+              size="small"
+              onClick={handleSaveSelection}
+              disabled={selectedCells.size === 0}
+              sx={{ 
+                fontSize: '0.75rem',
+                py: 0.25,
+                minHeight: 28,
+                textTransform: 'none',
+                borderRadius: 2
+              }}
+            >
+              {t('event.writeMode')}
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleCancelWrite}
+              sx={{ 
+                fontSize: '0.75rem',
+                py: 0.25,
+                minHeight: 28,
+                textTransform: 'none',
+                borderRadius: 2
+              }}
+            >
+              {t('event.cancelWrite')}
+            </Button>
+          </Box>
+        )}
 
-        <Typography variant="h6">그룹 일정</Typography>
         {FEATURES.ENABLE_IF_NEEDED && (
           <ToggleButtonGroup value={excludeIfNeeded} exclusive onChange={(e, newValue) => setExcludeIfNeeded(newValue)} aria-label="if needed filter" size="small">
-            <ToggleButton value={true} aria-label="exclude if needed" sx={{ fontSize: '0.75rem', py: 0.5 }}>필요한 경우 제외</ToggleButton>
+            <ToggleButton value={true} aria-label="exclude if needed" sx={{ fontSize: '0.75rem', py: 0.5 }}>{t('event.excludeIfNeeded')}</ToggleButton>
           </ToggleButtonGroup>
         )}
       </Box>
@@ -727,7 +947,6 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
           {/* Sidebar (fixed) */}
           <Box sx={{ width: '200px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, pr: 2 }}>
             <Participants />
-            <CalendarWriteSection />
             <MostAvailable />
           </Box>
         </Box>
@@ -741,50 +960,248 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
         anchorPosition={menuPosition}
         slotProps={{
           paper: {
-            style: {
-              minWidth: '200px'
+            sx: {
+              minWidth: '220px',
+              borderRadius: 2,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+              border: '1px solid',
+              borderColor: 'divider',
+              py: 0.5
             }
           }
         }}
       >
-        <MenuItem onClick={() => handleCalendarSelect('google')}>Google Calendar</MenuItem>
-        <MenuItem onClick={() => handleCalendarSelect('apple')}>Apple Calendar</MenuItem>
+        {googleConnected && (
+          <MenuItem 
+            onClick={() => handleCalendarSelect('google')}
+            sx={{
+              px: 2,
+              py: 1,
+              borderRadius: 1,
+              mx: 1,
+              '&:hover': {
+                backgroundColor: 'action.hover',
+              }
+            }}
+          >
+            <GoogleIcon sx={{ mr: 2, fontSize: 20 }} />
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                {googleUser?.email || t('calendar.googleCalendar')}
+              </Typography>
+            </Box>
+          </MenuItem>
+        )}
+        {appleCalendarConnected && (
+          <MenuItem 
+            onClick={() => handleCalendarSelect('apple')}
+            sx={{
+              px: 2,
+              py: 1,
+              borderRadius: 1,
+              mx: 1,
+              '&:hover': {
+                backgroundColor: 'action.hover',
+              }
+            }}
+          >
+            <AppleIcon sx={{ mr: 2, fontSize: 20, color: '#000' }} />
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                {appleCalendarUser?.appleId || t('calendar.appleCalendar')}
+              </Typography>
+            </Box>
+          </MenuItem>
+        )}
+        {!googleConnected && !appleCalendarConnected && (
+          <Box sx={{ px: 3, py: 2, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              {t('event.noConnectedCalendars')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t('event.connectCalendarInSettings')}
+            </Typography>
+          </Box>
+        )}
       </Menu>
 
       {/* Event Creation Dialog */}
-      <Dialog open={eventDialog} onClose={() => setEventDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>캘린더 이벤트 생성</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="이벤트 제목"
-            fullWidth
-            variant="outlined"
-            value={eventTitle}
-            onChange={(e) => setEventTitle(e.target.value)}
-            sx={{ mt: 1 }}
-          />
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            {selectedCalendarType === 'google' ? 'Google Calendar' : 'Apple Calendar'}에 저장됩니다.
+      <Dialog 
+        open={eventDialog} 
+        onClose={() => !isCreating && setEventDialog(false)} 
+        maxWidth="xs" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            m: 2
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          pb: 1
+        }}>
+          <Typography variant="h6" fontWeight={600}>
+            {selectedCalendarType === 'google' ? t('calendar.googleCalendar') : t('calendar.appleCalendar')} {t('event.createCalendarEvent')}
           </Typography>
-          {eventDetails.eventType === 'day' && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              요일 기반 이벤트는 반복 일정으로 생성됩니다.
-            </Typography>
-          )}
+          <IconButton
+            onClick={() => !isCreating && setEventDialog(false)}
+            disabled={isCreating}
+            sx={{ 
+              color: 'text.secondary',
+              '&:hover': { backgroundColor: 'action.hover' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              variant="outlined"
+              value={eventTitle}
+              onChange={(e) => setEventTitle(e.target.value)}
+              disabled={isCreating}
+              placeholder={t('event.eventTitlePlaceholder')}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  '&.Mui-focused fieldset': {
+                    borderColor: selectedCalendarType === 'google' ? '#4285f4' : '#007aff',
+                  }
+                }
+              }}
+            />
+            
+            {/* Event type info */}
+            {eventDetails.eventType === 'day' && (
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                p: 1.5,
+                bgcolor: 'info.light',
+                color: 'info.contrastText',
+                borderRadius: 1,
+                '& .MuiTypography-root': {
+                  color: 'info.contrastText'
+                }
+              }}>
+                <CheckCircleIcon sx={{ fontSize: 20 }} />
+                <Typography variant="body2">
+                  {t('event.recurringEvent')}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Selection summary */}
+            <Box sx={{
+              p: 2,
+              bgcolor: 'grey.50',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'grey.200'
+            }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {t('event.selectedTimes')}
+              </Typography>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontSize: '0.75rem',
+                  lineHeight: 1.4,
+                  wordBreak: 'break-all',
+                  whiteSpace: 'pre-line'
+                }}
+              >
+                {formatSelectedTimeSlots()}
+              </Typography>
+            </Box>
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEventDialog(false)} disabled={isCreating}>취소</Button>
+        <DialogActions sx={{ p: 3, pt: 2, justifyContent: 'center' }}>
           <Button 
             onClick={handleCreateEvent} 
             variant="contained" 
             disabled={!eventTitle.trim() || isCreating}
+            autoFocus
+            fullWidth
+            sx={{ 
+              borderRadius: 2,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              bgcolor: selectedCalendarType === 'google' ? '#4285f4' : '#007aff',
+              '&:hover': {
+                bgcolor: selectedCalendarType === 'google' ? '#3367d6' : '#0056cc',
+                boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)',
+              },
+              '&:disabled': {
+                boxShadow: 'none',
+              }
+            }}
           >
-            {isCreating ? '생성 중...' : '생성'}
+            {isCreating ? (
+              <>
+                <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                {t('event.creating')}
+              </>
+            ) : (
+              t('event.createEvent')
+            )}
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Toast for notifications */}
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
+
+      {/* Login Dialog */}
+      <LoginDialog 
+        open={loginDialogOpen} 
+        onClose={() => setLoginDialogOpen(false)} 
+      />
+      
+      {/* Calendar Selection Dialog */}
+      <CalendarSelectionDialog
+        open={calendarSelectionDialogOpen}
+        onClose={() => setCalendarSelectionDialogOpen(false)}
+        onGoogleSelect={() => {
+          setCalendarSelectionDialogOpen(false);
+          if (user?.providerData[0]?.providerId === 'google.com') {
+            connectGoogle();
+          } else {
+            showToast(t('errors.loginRequired'), 'info');
+          }
+        }}
+        onAppleSelect={() => {
+          setCalendarSelectionDialogOpen(false);
+          setAppleDialogOpen(true);
+        }}
+        isGoogleUser={user?.providerData[0]?.providerId === 'google.com'}
+        showAlert={(message) => {
+          showToast(message, 'info');
+        }}
+      />
+
+      {/* Apple Calendar Dialog */}
+      <AppleCalendarDialog
+        open={appleDialogOpen}
+        onClose={() => setAppleDialogOpen(false)}
+        onConnect={handleAppleCalendarConnect}
+        error={null}
+        isLoading={false}
+      />
     </Box>
   );
 });

@@ -26,8 +26,8 @@ const db = admin.firestore();
 // Set Firestore settings to avoid issues
 db.settings({ ignoreUndefinedProperties: true });
 
-// In-memory access token cache
-const accessTokenCache = new Map(); // uid -> {token, expiry}
+// Removed access token cache to prevent account confusion
+// Always refresh tokens from Firestore for security and consistency
 
 // Apple Calendar DAV client cache (singleton pattern)
 const davClientCache = new Map(); // userId -> {client, lastUsed, credentials}
@@ -883,11 +883,25 @@ exports.googleCalendarExchangeCode = functions.region('asia-northeast3').https.o
       lastUsed: admin.firestore.FieldValue.serverTimestamp()
     });
 
-    // Store access token in cache (backend only)
-    accessTokenCache.set(context.auth.uid, {
-      token: tokens.access_token,
-      expiry: Date.now() + (tokens.expiry_date || 3600 * 1000)
-    });
+    // No caching - always use fresh tokens for security
+
+    // Get user info with the new token
+    try {
+      const oauth2Client = new OAuth2Client();
+      oauth2Client.setCredentials({ access_token: tokens.access_token });
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const userInfo = await oauth2.userinfo.get();
+      
+      // Store user info along with credentials
+      await db.collection('google_credentials').doc(context.auth.uid).update({
+        googleEmail: userInfo.data.email,
+        googleName: userInfo.data.name,
+        googlePicture: userInfo.data.picture
+      });
+    } catch (userInfoError) {
+      // Don't fail the connection if user info fetch fails
+      console.error('[googleCalendarExchangeCode] Failed to fetch user info:', userInfoError.message);
+    }
 
     // BFF Pattern: Don't return access token to frontend
     return {
@@ -905,12 +919,8 @@ exports.googleCalendarExchangeCode = functions.region('asia-northeast3').https.o
 // Helper function to get valid access token with better error handling
 async function getValidAccessToken(userId) {
   try {
-    // Check memory cache first
-    const cached = accessTokenCache.get(userId);
-    if (cached && Date.now() < cached.expiry - 60000) { // 1 minute buffer
-      console.log('[getValidAccessToken] Using cached token for user:', userId);
-      return cached.token;
-    }
+    // Always get fresh token from Firestore - no caching for security
+    console.log('[getValidAccessToken] Getting fresh access token for user:', userId);
 
     // Get refresh token from Firestore
     const credDoc = await db.collection('google_credentials').doc(userId).get();
@@ -941,12 +951,6 @@ async function getValidAccessToken(userId) {
         throw new Error('Failed to obtain access token');
       }
       
-      // Cache the new access token
-      accessTokenCache.set(userId, {
-        token: credentials.access_token,
-        expiry: credentials.expiry_date || Date.now() + 3600 * 1000
-      });
-      
       console.log('[getValidAccessToken] Successfully refreshed token for user:', userId);
     
     // Update last used timestamp
@@ -960,7 +964,6 @@ async function getValidAccessToken(userId) {
       if (error.message?.includes('invalid_grant')) {
         // Delete invalid credentials
         await credDoc.ref.delete();
-        accessTokenCache.delete(userId);
         throw new functions.https.HttpsError(
           "unauthenticated", 
           "Google Calendar 연동이 만료되었습니다. 다시 연동해주세요."
@@ -1006,11 +1009,7 @@ exports.googleCalendarRefreshToken = functions.region('asia-northeast3').https.o
     
     const { credentials } = await oauth2Client.refreshAccessToken();
     
-    // Cache the new access token
-    accessTokenCache.set(context.auth.uid, {
-      token: credentials.access_token,
-      expiry: credentials.expiry_date || Date.now() + 3600 * 1000
-    });
+    // No caching - always use fresh tokens
     
     // Update last used timestamp
     await credDoc.ref.update({
@@ -1026,7 +1025,6 @@ exports.googleCalendarRefreshToken = functions.region('asia-northeast3').https.o
     if (error.message?.includes('invalid_grant')) {
       // Delete invalid credentials
       await db.collection('google_credentials').doc(context.auth.uid).delete();
-      accessTokenCache.delete(context.auth.uid);
       throw new functions.https.HttpsError(
         "unauthenticated", 
         "Google Calendar connection expired. Please reconnect."
@@ -1052,14 +1050,14 @@ exports.googleCalendarCheckStatus = functions.region('asia-northeast3').https.on
       return { connected: false };
     }
 
-    // Check cached access token (backend only)
-    const cached = accessTokenCache.get(context.auth.uid);
-    const hasValidToken = cached && Date.now() < cached.expiry - 60000;
+    const credData = credDoc.data();
     
     // BFF Pattern: Don't expose token details
     return { 
       connected: true,
-      tokenValid: hasValidToken
+      googleEmail: credData.googleEmail,
+      googleName: credData.googleName,
+      googlePicture: credData.googlePicture
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) {
@@ -1079,8 +1077,7 @@ exports.googleCalendarDisconnect = functions.region('asia-northeast3').https.onC
     // Delete stored credentials
     await db.collection('google_credentials').doc(context.auth.uid).delete();
     
-    // Clear cache
-    accessTokenCache.delete(context.auth.uid);
+    // No cache to clear - always uses fresh tokens
     
     // Google Calendar disconnected
     return { success: true };
@@ -1421,39 +1418,79 @@ exports.getGoogleCalendarEvents = functions
     try {
       const timeMin = new Date(startDate).toISOString();
       const timeMax = new Date(endDate).toISOString();
-      console.log('[getGoogleCalendarEvents] Fetching events from Google Calendar:', {
+      console.log('[getGoogleCalendarEvents] Fetching events from all calendars:', {
         timeMin,
         timeMax
       });
       
-      const response = await withExponentialBackoff(async () => {
-        return await calendar.events.list({
-          calendarId: 'primary',
-          timeMin: timeMin,
-          timeMax: timeMax,
-          singleEvents: true,
-          orderBy: 'startTime',
-          maxResults: 250,
-          fields: 'items(id,summary,start,end,status,transparency,recurringEventId)'
+      // First, get list of all calendars
+      const calendarListResponse = await withExponentialBackoff(async () => {
+        return await calendar.calendarList.list({
+          minAccessRole: 'freeBusyReader',
+          showHidden: false,
+          showDeleted: false
         });
       });
       
-      console.log('[getGoogleCalendarEvents] Google Calendar API response:', {
-        itemsCount: response.data.items ? response.data.items.length : 0,
-        hasItems: !!response.data.items
+      console.log('[getGoogleCalendarEvents] Found calendars:', calendarListResponse.data.items?.length || 0);
+      
+      // Fetch events from all calendars in parallel
+      const calendarPromises = (calendarListResponse.data.items || []).map(async (cal) => {
+        try {
+          console.log(`[getGoogleCalendarEvents] Fetching from calendar: ${cal.summary} (${cal.id})`);
+          const response = await withExponentialBackoff(async () => {
+            return await calendar.events.list({
+              calendarId: cal.id,
+              timeMin: timeMin,
+              timeMax: timeMax,
+              singleEvents: true,
+              orderBy: 'startTime',
+              maxResults: 250,
+              fields: 'items(id,summary,start,end,status,transparency,recurringEventId)'
+            });
+          });
+          
+          // Add calendar info to each event
+          return (response.data.items || []).map(event => ({
+            ...event,
+            calendarName: cal.summary,
+            calendarId: cal.id
+          }));
+        } catch (error) {
+          console.log(`[getGoogleCalendarEvents] Error fetching from calendar ${cal.summary}:`, error.message);
+          return [];
+        }
       });
       
-      // Process events
-      let events = (response.data.items || []).map(event => ({
-        id: event.id,
-        title: event.summary || 'Untitled',
-        start: event.start.dateTime || event.start.date,
-        end: event.end.dateTime || event.end.date,
-        isAllDay: !event.start.dateTime,
-        status: event.status,
-        transparency: event.transparency || 'opaque',
-        isRecurring: !!event.recurringEventId,
-      }));
+      const allCalendarResults = await Promise.allSettled(calendarPromises);
+      const allEvents = allCalendarResults
+        .filter(result => result.status === 'fulfilled')
+        .flatMap(result => result.value || []);
+      
+      console.log('[getGoogleCalendarEvents] Total events from all calendars:', allEvents.length);
+      
+      // Process events and filter only busy (opaque) events
+      let events = allEvents
+        .filter(event => {
+          // Only include events that are actually busy (opaque)
+          // Events with transparency 'transparent' are like holidays, birthdays, etc.
+          const transparency = event.transparency || 'opaque';
+          const status = event.status || 'confirmed';
+          
+          // Include only confirmed/tentative events that are opaque (busy)
+          return (status === 'confirmed' || status === 'tentative') && transparency === 'opaque';
+        })
+        .map(event => ({
+          id: event.id,
+          title: event.summary || 'Untitled',
+          start: event.start.dateTime || event.start.date,
+          end: event.end.dateTime || event.end.date,
+          isAllDay: !event.start.dateTime,
+          status: event.status,
+          transparency: event.transparency || 'opaque',
+          isRecurring: !!event.recurringEventId,
+          calendarName: event.calendarName,
+        }));
 
       console.log('[getGoogleCalendarEvents] Raw events count:', events.length);
       if (events.length > 0) {
@@ -1576,8 +1613,7 @@ exports.getGoogleCalendarEvents = functions
     } catch (calendarError) {
       
       if (calendarError.code === 401) {
-        // Token might be expired, clear from cache and throw error
-        accessTokenCache.delete(context.auth.uid);
+        // Token might be expired
         throw new functions.https.HttpsError(
           "unauthenticated", 
           "Google Calendar 인증이 만료되었습니다. 다시 시도해주세요."
@@ -1622,6 +1658,280 @@ exports.appleCalendarDisconnect = functions.region('asia-northeast3').https.onCa
       "internal",
       error.message || "Failed to disconnect Apple Calendar"
     );
+  }
+});
+
+// Create Apple Calendar Event
+exports.createAppleCalendarEvent = functions.region('asia-northeast3').https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const userId = context.auth.uid;
+  
+  // Check rate limit
+  await checkRateLimit(userId, 'calendar_create');
+
+  try {
+    const {
+      title,
+      timeSlots,
+      eventType,
+      selectedDays
+    } = data;
+
+    if (!title || !timeSlots || timeSlots.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'Title and time slots are required');
+    }
+
+    // Get Apple Calendar credentials
+    const credDoc = await db.collection('apple_credentials').doc(userId).get();
+    if (!credDoc.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'Apple Calendar not connected');
+    }
+
+    const credData = credDoc.data();
+    const decryptedPassword = await decrypt(credData.encryptedPassword);
+
+    // Get or create DAV client
+    let client;
+    const cacheKey = userId;
+    const cachedClient = davClientCache.get(cacheKey);
+    const passwordHash = crypto.createHash('sha256').update(decryptedPassword).digest('hex');
+    
+    if (cachedClient && 
+        cachedClient.credentials.appleId === credData.appleId &&
+        cachedClient.credentials.passwordHash === passwordHash) {
+      client = cachedClient.client;
+      cachedClient.lastUsed = Date.now();
+    } else {
+      const { createDAVClient } = require('tsdav');
+      client = await createDAVClient({
+        serverUrl: 'https://caldav.icloud.com',
+        credentials: {
+          username: credData.appleId,
+          password: decryptedPassword,
+        },
+        authMethod: 'Basic',
+        defaultAccountType: 'caldav',
+      });
+      
+      davClientCache.set(cacheKey, {
+        client,
+        lastUsed: Date.now(),
+        credentials: {
+          appleId: credData.appleId,
+          passwordHash
+        }
+      });
+    }
+
+    const events = [];
+
+    // Get or create TimeCheck calendar
+    console.log('[createAppleCalendarEvent] Fetching calendars...');
+    const calendars = await client.fetchCalendars();
+    console.log('[createAppleCalendarEvent] Found calendars:', calendars?.length || 0);
+    
+    if (!calendars || calendars.length === 0) {
+      throw new Error('No calendars found');
+    }
+    
+    // Look for existing TimeCheck calendar first
+    let targetCalendar = calendars.find(cal => 
+      cal.displayName === 'TimeCheck' && 
+      cal.components && 
+      cal.components.includes('VEVENT')
+    );
+    
+    if (!targetCalendar) {
+      // If no TimeCheck calendar, use the first available event calendar
+      const eventCalendars = calendars.filter(cal => 
+        cal.components && cal.components.includes('VEVENT')
+      );
+      
+      if (eventCalendars.length === 0) {
+        throw new Error('No event calendars found. Available calendars: ' + calendars.map(c => c.displayName).join(', '));
+      }
+      
+      targetCalendar = eventCalendars[0];
+      console.log('[createAppleCalendarEvent] No TimeCheck calendar found, using first event calendar:', targetCalendar.displayName);
+    } else {
+      console.log('[createAppleCalendarEvent] Using existing TimeCheck calendar');
+    }
+    
+    console.log('[createAppleCalendarEvent] Using calendar:', targetCalendar.displayName || targetCalendar.url);
+
+    if (eventType === 'day') {
+      // Create recurring events for day-based events
+      const timeRanges = groupConsecutiveTimeSlots(timeSlots);
+
+      for (const range of timeRanges) {
+        // Find the next occurrence of the first selected day
+        const firstDay = selectedDays[0];
+        const dayMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
+        const targetDayOfWeek = dayMap[firstDay];
+        
+        const now = new Date();
+        const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+        
+        const daysUntilTarget = (targetDayOfWeek - koreaTime.getDay() + 7) % 7;
+        const startDate = new Date(koreaTime);
+        startDate.setDate(koreaTime.getDate() + daysUntilTarget);
+        
+        const startDateTime = new Date(startDate);
+        startDateTime.setHours(parseInt(range.startTime.split(':')[0]), parseInt(range.startTime.split(':')[1]), 0, 0);
+        
+        const endDateTime = new Date(startDate);
+        endDateTime.setHours(parseInt(range.endTime.split(':')[0]), parseInt(range.endTime.split(':')[1]), 0, 0);
+
+        // Create RRULE for weekly recurrence
+        const rruleMap = { Mon: 'MO', Tue: 'TU', Wed: 'WE', Thu: 'TH', Fri: 'FR', Sat: 'SA', Sun: 'SU' };
+        const rruleDays = selectedDays.map(day => rruleMap[day]).join(',');
+
+        // Format dates for iCalendar (YYYYMMDDTHHMMSS) in local timezone
+        const formatICalDate = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          const seconds = String(date.getSeconds()).padStart(2, '0');
+          return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+        };
+
+        const icalEvent = [
+          'BEGIN:VEVENT',
+          `UID:timecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@timecheck.app`,
+          `DTSTART;TZID=Asia/Seoul:${formatICalDate(startDateTime)}`,
+          `DTEND;TZID=Asia/Seoul:${formatICalDate(endDateTime)}`,
+          `RRULE:FREQ=WEEKLY;BYDAY=${rruleDays}`,
+          `SUMMARY:${title}`,
+          'DESCRIPTION:Created from TimeCheck',
+          `DTSTAMP:${formatICalDate(new Date())}`,
+          'CREATED:' + formatICalDate(new Date()),
+          'LAST-MODIFIED:' + formatICalDate(new Date()),
+          'END:VEVENT'
+        ].join('\r\n');
+
+        const calendarObject = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//TimeCheck//TimeCheck//EN',
+          'BEGIN:VTIMEZONE',
+          'TZID:Asia/Seoul',
+          'BEGIN:STANDARD',
+          'DTSTART:19701101T000000',
+          'TZOFFSETFROM:+0900',
+          'TZOFFSETTO:+0900',
+          'TZNAME:KST',
+          'END:STANDARD',
+          'END:VTIMEZONE',
+          icalEvent,
+          'END:VCALENDAR'
+        ].join('\r\n');
+
+        // Create event via CalDAV
+        console.log('[createAppleCalendarEvent] Creating recurring event:', title);
+        console.log('[createAppleCalendarEvent] iCal length:', calendarObject.length);
+        
+        const result = await client.createCalendarObject({
+          calendar: targetCalendar,
+          iCalString: calendarObject,
+          filename: `timecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.ics`
+        });
+        
+        console.log('[createAppleCalendarEvent] Recurring event created successfully:', result);
+
+        events.push({ summary: title, start: startDateTime, end: endDateTime });
+      }
+    } else {
+      // Create single events for date-based events
+      const eventsByDate = groupTimeSlotsByDate(timeSlots);
+
+      for (const [dateStr, slots] of Object.entries(eventsByDate)) {
+        const timeRanges = groupConsecutiveTimeSlots(slots);
+
+        for (const range of timeRanges) {
+          // Parse date and time in Korea timezone (UTC+9)
+          const [year, month, day] = dateStr.split('-').map(Number);
+          const [startHour, startMinute] = range.startTime.split(':').map(Number);
+          const [endHour, endMinute] = range.endTime.split(':').map(Number);
+          
+          // Create dates in Korea timezone
+          const startDateTime = new Date();
+          startDateTime.setFullYear(year, month - 1, day);
+          startDateTime.setHours(startHour, startMinute, 0, 0);
+          
+          const endDateTime = new Date();
+          endDateTime.setFullYear(year, month - 1, day);
+          endDateTime.setHours(endHour, endMinute, 0, 0);
+
+          const formatICalDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+          };
+
+          const icalEvent = [
+            'BEGIN:VEVENT',
+            `UID:timecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@timecheck.app`,
+            `DTSTART;TZID=Asia/Seoul:${formatICalDate(startDateTime)}`,
+            `DTEND;TZID=Asia/Seoul:${formatICalDate(endDateTime)}`,
+            `SUMMARY:${title}`,
+            'DESCRIPTION:Created from TimeCheck',
+            `DTSTAMP:${formatICalDate(new Date())}`,
+            'CREATED:' + formatICalDate(new Date()),
+            'LAST-MODIFIED:' + formatICalDate(new Date()),
+            'END:VEVENT'
+          ].join('\r\n');
+
+          const calendarObject = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//TimeCheck//TimeCheck//EN',
+            'BEGIN:VTIMEZONE',
+            'TZID:Asia/Seoul',
+            'BEGIN:STANDARD',
+            'DTSTART:19701101T000000',
+            'TZOFFSETFROM:+0900',
+            'TZOFFSETTO:+0900',
+            'TZNAME:KST',
+            'END:STANDARD',
+            'END:VTIMEZONE',
+            icalEvent,
+            'END:VCALENDAR'
+          ].join('\r\n');
+
+          console.log('[createAppleCalendarEvent] Creating single event:', title);
+          console.log('[createAppleCalendarEvent] iCal length:', calendarObject.length);
+          
+          const result = await client.createCalendarObject({
+            calendar: targetCalendar,
+            iCalString: calendarObject,
+            filename: `timecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.ics`
+          });
+          
+          console.log('[createAppleCalendarEvent] Single event created successfully:', result);
+
+          events.push({ summary: title, start: startDateTime, end: endDateTime });
+        }
+      }
+    }
+
+    return { 
+      success: true, 
+      eventsCreated: events.length,
+      events: events 
+    };
+
+  } catch (error) {
+    console.error('[createAppleCalendarEvent] Error:', error.message);
+    throw new functions.https.HttpsError('internal', `Apple Calendar event creation failed: ${error.message}`);
   }
 });
 
@@ -1735,6 +2045,39 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
     oauth2Client.setCredentials({ access_token: accessToken });
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
+    // Get or create TimeCheck calendar
+    let timeCheckCalendarId = 'primary'; // Default to primary calendar
+    
+    try {
+      // List calendars to find TimeCheck calendar
+      const calendarList = await calendar.calendarList.list();
+      const timeCheckCalendar = calendarList.data.items?.find(cal => 
+        cal.summary === 'TimeCheck'
+      );
+      
+      if (timeCheckCalendar) {
+        timeCheckCalendarId = timeCheckCalendar.id;
+        console.log('[createGoogleCalendarEvent] Using existing TimeCheck calendar:', timeCheckCalendarId);
+      } else {
+        // Create new TimeCheck calendar
+        console.log('[createGoogleCalendarEvent] Creating new TimeCheck calendar...');
+        
+        const newCalendar = await calendar.calendars.insert({
+          resource: {
+            summary: 'TimeCheck',
+            description: 'Calendar for TimeCheck events',
+            timeZone: 'Asia/Seoul'
+          }
+        });
+        
+        timeCheckCalendarId = newCalendar.data.id;
+        console.log('[createGoogleCalendarEvent] Created TimeCheck calendar:', timeCheckCalendarId);
+      }
+    } catch (calendarError) {
+      console.warn('[createGoogleCalendarEvent] Failed to create/find TimeCheck calendar, using primary:', calendarError.message);
+      // Keep using primary calendar as fallback
+    }
+
     const events = [];
 
     if (eventType === 'day') {
@@ -1748,10 +2091,24 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
       const timeRanges = groupConsecutiveTimeSlots(timeSlots);
 
       for (const range of timeRanges) {
-        const startDateTime = new Date();
+        // Find the next occurrence of the first selected day for proper recurring event start
+        const firstDay = selectedDays[0]; // Mon, Tue, etc.
+        const dayMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
+        const targetDayOfWeek = dayMap[firstDay];
+        
+        // Create date in Korea timezone
+        const now = new Date();
+        const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+        
+        // Find next occurrence of the target day
+        const daysUntilTarget = (targetDayOfWeek - koreaTime.getDay() + 7) % 7;
+        const startDate = new Date(koreaTime);
+        startDate.setDate(koreaTime.getDate() + daysUntilTarget);
+        
+        const startDateTime = new Date(startDate);
         startDateTime.setHours(parseInt(range.startTime.split(':')[0]), parseInt(range.startTime.split(':')[1]), 0, 0);
         
-        const endDateTime = new Date();
+        const endDateTime = new Date(startDate);
         endDateTime.setHours(parseInt(range.endTime.split(':')[0]), parseInt(range.endTime.split(':')[1]), 0, 0);
 
         const event = {
@@ -1771,7 +2128,7 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
         };
 
         const response = await calendar.events.insert({
-          calendarId: 'primary',
+          calendarId: timeCheckCalendarId,
           resource: event
         });
 
@@ -1785,8 +2142,9 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
         const timeRanges = groupConsecutiveTimeSlots(slots);
 
         for (const range of timeRanges) {
-          const startDateTime = new Date(`${dateStr}T${range.startTime}:00`);
-          const endDateTime = new Date(`${dateStr}T${range.endTime}:00`);
+          // Create datetime strings with explicit Korea timezone
+          const startDateTime = new Date(`${dateStr}T${range.startTime}:00+09:00`);
+          const endDateTime = new Date(`${dateStr}T${range.endTime}:00+09:00`);
 
           const event = {
             summary: title,
@@ -1802,7 +2160,7 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
           };
 
           const response = await calendar.events.insert({
-            calendarId: 'primary',
+            calendarId: timeCheckCalendarId,
             resource: event
           });
 

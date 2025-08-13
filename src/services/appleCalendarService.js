@@ -8,6 +8,7 @@ class AppleCalendarService {
     this.connectFunction = httpsCallable(functions, 'appleCalendarConnect');
     this.getEventsFunction = httpsCallable(functions, 'appleCalendarGetEvents');
     this.disconnectFunction = httpsCallable(functions, 'appleCalendarDisconnect');
+    this.createEventFunction = httpsCallable(functions, 'createAppleCalendarEvent');
   }
 
   async connect(appleId, appSpecificPassword) {
@@ -70,6 +71,21 @@ class AppleCalendarService {
         throw new Error('Apple Calendar not connected. Please connect first.');
       }
       
+      throw error;
+    }
+  }
+
+  // Create calendar event
+  async createEvent(title, timeSlots, eventType, selectedDays) {
+    try {
+      const result = await this.createEventFunction({
+        title,
+        timeSlots,
+        eventType,
+        selectedDays
+      });
+      return result.data;
+    } catch (error) {
       throw error;
     }
   }

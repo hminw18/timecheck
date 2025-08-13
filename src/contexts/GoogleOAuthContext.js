@@ -17,6 +17,7 @@ export const GoogleOAuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [googleUser, setGoogleUser] = useState(null);
   
   const googleClientRef = useRef(null);
 
@@ -27,7 +28,7 @@ export const GoogleOAuthProvider = ({ children }) => {
     try {
       googleClientRef.current = window.google.accounts.oauth2.initCodeClient({
         client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/calendar.readonly',
+        scope: 'https://www.googleapis.com/auth/calendar profile email',
         ux_mode: 'popup',
         callback: handleAuthorizationResponse,
       });
@@ -143,6 +144,7 @@ export const GoogleOAuthProvider = ({ children }) => {
       
       // Clear connection state
       setIsConnected(false);
+      setGoogleUser(null);
     } catch (error) {
       setError('Failed to disconnect');
     } finally {
@@ -157,8 +159,18 @@ export const GoogleOAuthProvider = ({ children }) => {
     try {
       const status = await googleCalendarService.checkConnectionStatus();
       setIsConnected(status.connected);
+      if (status.connected && status.googleEmail) {
+        setGoogleUser({
+          email: status.googleEmail,
+          name: status.googleName,
+          picture: status.googlePicture
+        });
+      } else {
+        setGoogleUser(null);
+      }
     } catch (error) {
       // Silently fail status check
+      setGoogleUser(null);
     }
   }, [user]);
 
@@ -173,6 +185,7 @@ export const GoogleOAuthProvider = ({ children }) => {
     error,
     isConnected,
     isConnecting: isLoading,
+    googleUser,
     connect,
     disconnect,
     checkConnectionStatus,
