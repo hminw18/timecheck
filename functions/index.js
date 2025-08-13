@@ -1677,7 +1677,8 @@ exports.createAppleCalendarEvent = functions.region('asia-northeast3').https.onC
       title,
       timeSlots,
       eventType,
-      selectedDays
+      selectedDays,
+      recurrenceEndDate
     } = data;
 
     if (!title || !timeSlots || timeSlots.length === 0) {
@@ -1788,6 +1789,18 @@ exports.createAppleCalendarEvent = functions.region('asia-northeast3').https.onC
         // Create RRULE for weekly recurrence
         const rruleMap = { Mon: 'MO', Tue: 'TU', Wed: 'WE', Thu: 'TH', Fri: 'FR', Sat: 'SA', Sun: 'SU' };
         const rruleDays = selectedDays.map(day => rruleMap[day]).join(',');
+        
+        // Build RRULE with optional end date
+        let rrule = `FREQ=WEEKLY;BYDAY=${rruleDays}`;
+        if (recurrenceEndDate) {
+          // Convert end date to RRULE format (YYYYMMDD)
+          const endDate = new Date(recurrenceEndDate);
+          const untilYear = endDate.getFullYear();
+          const untilMonth = String(endDate.getMonth() + 1).padStart(2, '0');
+          const untilDay = String(endDate.getDate()).padStart(2, '0');
+          rrule += `;UNTIL=${untilYear}${untilMonth}${untilDay}T235959Z`;
+        }
+        
 
         // Format dates for iCalendar (YYYYMMDDTHHMMSS) in local timezone
         const formatICalDate = (date) => {
@@ -1805,7 +1818,7 @@ exports.createAppleCalendarEvent = functions.region('asia-northeast3').https.onC
           `UID:timecheck-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@timecheck.app`,
           `DTSTART;TZID=Asia/Seoul:${formatICalDate(startDateTime)}`,
           `DTEND;TZID=Asia/Seoul:${formatICalDate(endDateTime)}`,
-          `RRULE:FREQ=WEEKLY;BYDAY=${rruleDays}`,
+          `RRULE:${rrule}`,
           `SUMMARY:${title}`,
           'DESCRIPTION:Created from TimeCheck',
           `DTSTAMP:${formatICalDate(new Date())}`,
@@ -2030,7 +2043,8 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
       title,
       timeSlots,
       eventType,
-      selectedDays
+      selectedDays,
+      recurrenceEndDate
     } = data;
 
     if (!title || !timeSlots || timeSlots.length === 0) {
@@ -2081,49 +2095,75 @@ exports.createGoogleCalendarEvent = functions.region('asia-northeast3').https.on
     const events = [];
 
     if (eventType === 'day') {
-      // Create recurring events for day-based events
-      const recurrenceRule = `FREQ=WEEKLY;BYDAY=${selectedDays.map(day => {
-        const dayMap = { Mon: 'MO', Tue: 'TU', Wed: 'WE', Thu: 'TH', Fri: 'FR', Sat: 'SA', Sun: 'SU' };
-        return dayMap[day];
-      }).join(',')}`;
-
+      // Create a single weekly recurring event for all selected days
+      const dayMap = { Mon: 'MO', Tue: 'TU', Wed: 'WE', Thu: 'TH', Fri: 'FR', Sat: 'SA', Sun: 'SU' };
+      const dayNumber = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
+      
+      // Convert selected days to RRULE format
+      const rruleDays = selectedDays.map(day => dayMap[day]).join(',');
+      
+      // Build recurrence rule with optional end date
+      let rrule = `RRULE:FREQ=WEEKLY;BYDAY=${rruleDays}`;
+      if (recurrenceEndDate) {
+        // Convert end date to RRULE format (YYYYMMDD)
+        const endDate = new Date(recurrenceEndDate);
+        const untilYear = endDate.getFullYear();
+        const untilMonth = String(endDate.getMonth() + 1).padStart(2, '0');
+        const untilDay = String(endDate.getDate()).padStart(2, '0');
+        rrule += `;UNTIL=${untilYear}${untilMonth}${untilDay}T235959Z`;
+      }
+      
+      
       // Group consecutive time slots
       const timeRanges = groupConsecutiveTimeSlots(timeSlots);
-
+      
+      // Find the next occurrence of the first selected day
+      const firstDay = selectedDays[0];
+      const targetDayOfWeek = dayNumber[firstDay];
+      
+      // Create proper timezone-aware date for next occurrence
+      const now = new Date();
+      const koreaOffset = 9 * 60; // Korea is UTC+9
+      const koreaTime = new Date(now.getTime() + (koreaOffset - now.getTimezoneOffset()) * 60000);
+      
+      // Find next occurrence of the target day (or today if it matches)
+      const currentDayOfWeek = koreaTime.getDay();
+      let daysUntilTarget = (targetDayOfWeek - currentDayOfWeek + 7) % 7;
+      if (daysUntilTarget === 0 && koreaTime.getHours() < 23) {
+        // If today is the target day and it's not too late, schedule for today
+        daysUntilTarget = 0;
+      } else if (daysUntilTarget === 0) {
+        // If today is the target day but it's late, schedule for next week
+        daysUntilTarget = 7;
+      }
+      
+      const startDate = new Date(koreaTime);
+      startDate.setDate(koreaTime.getDate() + daysUntilTarget);
+      
+      // Create one event for each time range
       for (const range of timeRanges) {
-        // Find the next occurrence of the first selected day for proper recurring event start
-        const firstDay = selectedDays[0]; // Mon, Tue, etc.
-        const dayMap = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
-        const targetDayOfWeek = dayMap[firstDay];
+        const [startHour, startMin] = range.startTime.split(':').map(Number);
+        const [endHour, endMin] = range.endTime.split(':').map(Number);
         
-        // Create date in Korea timezone
-        const now = new Date();
-        const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+        // Create Korea timezone date strings
+        const year = startDate.getFullYear();
+        const month = String(startDate.getMonth() + 1).padStart(2, '0');
+        const date = String(startDate.getDate()).padStart(2, '0');
         
-        // Find next occurrence of the target day
-        const daysUntilTarget = (targetDayOfWeek - koreaTime.getDay() + 7) % 7;
-        const startDate = new Date(koreaTime);
-        startDate.setDate(koreaTime.getDate() + daysUntilTarget);
-        
-        const startDateTime = new Date(startDate);
-        startDateTime.setHours(parseInt(range.startTime.split(':')[0]), parseInt(range.startTime.split(':')[1]), 0, 0);
-        
-        const endDateTime = new Date(startDate);
-        endDateTime.setHours(parseInt(range.endTime.split(':')[0]), parseInt(range.endTime.split(':')[1]), 0, 0);
+        const startDateTimeStr = `${year}-${month}-${date}T${range.startTime}:00+09:00`;
+        const endDateTimeStr = `${year}-${month}-${date}T${range.endTime}:00+09:00`;
 
         const event = {
           summary: title,
           start: {
-            dateTime: startDateTime.toISOString(),
+            dateTime: startDateTimeStr,
             timeZone: 'Asia/Seoul',
           },
           end: {
-            dateTime: endDateTime.toISOString(),
+            dateTime: endDateTimeStr,
             timeZone: 'Asia/Seoul',
           },
-          recurrence: [
-            `RRULE:${recurrenceRule}`
-          ],
+          recurrence: [rrule],
           description: 'Created from TimeCheck'
         };
 

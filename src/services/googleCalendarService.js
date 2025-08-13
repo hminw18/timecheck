@@ -69,13 +69,14 @@ class GoogleCalendarService {
   }
 
   // Create calendar event
-  async createEvent(title, timeSlots, eventType, selectedDays) {
+  async createEvent(title, timeSlots, eventType, selectedDays, recurrenceEndDate) {
     try {
       const result = await this.createEventFunction({
         title,
         timeSlots,
         eventType,
-        selectedDays
+        selectedDays,
+        recurrenceEndDate
       });
       return result.data;
     } catch (error) {

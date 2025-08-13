@@ -82,7 +82,10 @@
     "enterTitle": "이벤트 제목을 입력해 주세요",
     "selectDate": "날짜를 선택해 주세요",
     "selectDay": "요일을 선택해 주세요",
-    "endTimeAfterStart": "종료 시간은 시작 시간보다 늦어야 합니다."
+    "endTimeAfterStart": "종료 시간은 시작 시간보다 늦어야 합니다.",
+    "recurrenceEnd": "반복 종료",
+    "untilDate": "종료 날짜",
+    "recurrenceEndHint": "비워두면 계속 반복됩니다"
   },
   "calendar": {
     "integration": "캘린더 연동",

@@ -32,6 +32,7 @@ export default function EventForm({ setEventDetails, isMobile }) {
   const [selectedDays, setSelectedDays] = useState([]); // For day-based events
   const [startTime, setStartTime] = useState(dayjs().set("hour", 9).set("minute", 0));
   const [endTime, setEndTime] = useState(dayjs().set("hour", 17).set("minute", 0));
+  const [endTimeValue, setEndTimeValue] = useState(17); // Track the actual selected value separately
   const [toast, setToast] = useState({ open: false, message: '', severity: 'error' });
 
   const showToast = (message, severity = 'error') => {
@@ -178,7 +179,8 @@ export default function EventForm({ setEventDetails, isMobile }) {
     }
     
     // Validate time range
-    if (startTime.hour() >= endTime.hour()) {
+    // Allow 0:00 to 24:00 (full day), but prevent other invalid ranges
+    if (startTime.hour() >= endTimeValue && !(startTime.hour() === 0 && endTimeValue === 24)) {
       showToast(t('event.endTimeAfterStart'), 'error');
       return;
     }
@@ -194,7 +196,7 @@ export default function EventForm({ setEventDetails, isMobile }) {
       selectedDays: eventType === "day" ? selectedDays : [],
       // Common fields
       startTime: startTime.format("HH:mm"),
-      endTime: endTime.format("HH:mm"),
+      endTime: endTimeValue === 24 ? "24:00" : endTime.format("HH:mm"),
     });
   };
 
@@ -338,8 +340,14 @@ export default function EventForm({ setEventDetails, isMobile }) {
                     const newStartHour = e.target.value;
                     setStartTime(dayjs().set('hour', newStartHour).set('minute', 0));
                     // If end time is less than or equal to new start time, adjust it
-                    if (endTime.hour() <= newStartHour) {
-                      setEndTime(dayjs().set('hour', Math.min(newStartHour + 1, 23)).set('minute', 0));
+                    if (endTimeValue <= newStartHour) {
+                      const newEndValue = Math.min(newStartHour + 1, 24);
+                      setEndTimeValue(newEndValue);
+                      if (newEndValue === 24) {
+                        setEndTime(dayjs().set('hour', 0).set('minute', 0).add(1, 'day'));
+                      } else {
+                        setEndTime(dayjs().set('hour', newEndValue).set('minute', 0));
+                      }
                     }
                   }}
                   size="small"
@@ -371,12 +379,17 @@ export default function EventForm({ setEventDetails, isMobile }) {
               
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap' }}>
                 <Select
-                  value={endTime.hour()}
+                  value={endTimeValue}
                   onChange={(e) => {
                     const newEndHour = e.target.value;
-                    setEndTime(dayjs().set('hour', newEndHour).set('minute', 0));
+                    setEndTimeValue(newEndHour);
+                    if (newEndHour === 24) {
+                      setEndTime(dayjs().set('hour', 0).set('minute', 0).add(1, 'day'));
+                    } else {
+                      setEndTime(dayjs().set('hour', newEndHour).set('minute', 0));
+                    }
                     // If start time is greater than or equal to new end time, adjust it
-                    if (startTime.hour() >= newEndHour) {
+                    if (startTime.hour() >= newEndHour && newEndHour !== 24) {
                       setStartTime(dayjs().set('hour', Math.max(newEndHour - 1, 0)).set('minute', 0));
                     }
                   }}
@@ -390,7 +403,21 @@ export default function EventForm({ setEventDetails, isMobile }) {
                     },
                   }}
                 >
-                  {Array.from({ length: 24 }, (_, i) => {
+                  {Array.from({ length: 25 }, (_, i) => {
+                    if (i === 24) {
+                      return (
+                        <MenuItem 
+                          key={i} 
+                          value={i}
+                          disabled={i <= startTime.hour()}
+                        >
+                          {i18n.language.startsWith('ko') 
+                            ? `오전 12시 (24:00)`
+                            : `12 AM (24:00)`
+                          }
+                        </MenuItem>
+                      );
+                    }
                     const period = i < 12 ? t('event.am') : t('event.pm');
                     const displayHour = i === 0 ? 12 : (i > 12 ? i - 12 : i);
                     const isKorean = i18n.language === 'ko';

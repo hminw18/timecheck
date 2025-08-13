@@ -82,7 +82,10 @@
     "enterTitle": "Please enter event title",
     "selectDate": "Please select date",
     "selectDay": "Please select day",
-    "endTimeAfterStart": "End time must be later than start time."
+    "endTimeAfterStart": "End time must be later than start time.",
+    "recurrenceEnd": "Recurrence End",
+    "untilDate": "End Date",
+    "recurrenceEndHint": "Leave empty to repeat indefinitely"
   },
   "calendar": {
     "integration": "My Calendars",

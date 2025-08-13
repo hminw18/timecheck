@@ -3,6 +3,10 @@ import { Table, TableBody, TableCell, TableContainer, TableRow, Typography, Tool
 import { useTranslation } from 'react-i18next';
 import { blue, green } from '@mui/material/colors';
 import { Close as CloseIcon, CheckCircle as CheckCircleIcon, Google as GoogleIcon, Apple as AppleIcon } from '@mui/icons-material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import MostAvailableTimes from './MostAvailableTimes';
 import ScheduleTable from './common/ScheduleTable';
 import TimeColumn from './common/TimeColumn';
@@ -38,6 +42,8 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
   const [eventTitle, setEventTitle] = useState('');
   const [selectedCalendarType, setSelectedCalendarType] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(null);
+  const [recurrenceCount, setRecurrenceCount] = useState('');
   
   // Toast for notifications
   const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
@@ -472,12 +478,25 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
     try {
       const timeSlots = Array.from(selectedCells);
       
+      // For day-based events, extract only the days that were actually selected
+      let actualSelectedDays = eventDetails.selectedDays;
+      if (eventDetails.eventType === 'day' && timeSlots.length > 0) {
+        const selectedDaysSet = new Set();
+        timeSlots.forEach(slot => {
+          // For day-based events, slot format is like "Mon-09:00", "Tue-14:30", etc.
+          const day = slot.split('-')[0];
+          selectedDaysSet.add(day);
+        });
+        actualSelectedDays = Array.from(selectedDaysSet);
+      }
+      
       if (selectedCalendarType === 'google') {
         const result = await googleCalendarService.createEvent(
           eventTitle,
           timeSlots,
           eventDetails.eventType,
-          eventDetails.selectedDays
+          actualSelectedDays,
+          recurrenceEndDate ? recurrenceEndDate.format('YYYY-MM-DD') : null
         );
         
         if (result.success) {
@@ -488,7 +507,8 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
           eventTitle,
           timeSlots,
           eventDetails.eventType,
-          eventDetails.selectedDays
+          actualSelectedDays,
+          recurrenceEndDate ? recurrenceEndDate.format('YYYY-MM-DD') : null
         );
         
         if (result.success) {
@@ -500,6 +520,8 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
       setEventDialog(false);
       setEventTitle('');
       setSelectedCalendarType('');
+      setRecurrenceEndDate(null);
+      setRecurrenceCount('');
       setWriteMode(false);
       setSelectedCells(new Set());
       
@@ -1077,25 +1099,80 @@ const GroupSchedule = React.memo(({ eventDetails, availableWeeks, groupSchedule,
               }}
             />
             
-            {/* Event type info */}
+            {/* Event type info and recurrence settings */}
             {eventDetails.eventType === 'day' && (
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                p: 1.5,
-                bgcolor: 'info.light',
-                color: 'info.contrastText',
-                borderRadius: 1,
-                '& .MuiTypography-root': {
-                  color: 'info.contrastText'
-                }
-              }}>
-                <CheckCircleIcon sx={{ fontSize: 20 }} />
-                <Typography variant="body2">
-                  {t('event.recurringEvent')}
-                </Typography>
-              </Box>
+              <>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  p: 1.5,
+                  bgcolor: 'info.light',
+                  color: 'info.contrastText',
+                  borderRadius: 1,
+                  '& .MuiTypography-root': {
+                    color: 'info.contrastText'
+                  }
+                }}>
+                  <CheckCircleIcon sx={{ fontSize: 20 }} />
+                  <Typography variant="body2">
+                    {t('event.recurringEvent')}
+                  </Typography>
+                </Box>
+                
+                {/* Recurrence end options */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('event.recurrenceEnd')}
+                  </Typography>
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                      label={t('event.untilDate')}
+                      value={recurrenceEndDate}
+                      onChange={(newValue) => setRecurrenceEndDate(newValue)}
+                      disabled={isCreating}
+                      minDate={dayjs().add(1, 'day')}
+                      format="YYYY년 MM월 DD일"
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          size: 'small',
+                          sx: {
+                            '& .MuiOutlinedInput-root': {
+                              '&.Mui-focused fieldset': {
+                                borderColor: selectedCalendarType === 'google' ? '#4285f4' : '#007aff',
+                              }
+                            }
+                          }
+                        },
+                        desktopPaper: {
+                          sx: {
+                            '& .MuiPickersDay-root': {
+                              borderRadius: 2,
+                              '&:hover': {
+                                backgroundColor: selectedCalendarType === 'google' ? 'rgba(66, 133, 244, 0.08)' : 'rgba(0, 122, 255, 0.08)',
+                              },
+                              '&.Mui-selected': {
+                                backgroundColor: selectedCalendarType === 'google' ? '#4285f4' : '#007aff',
+                                '&:hover': {
+                                  backgroundColor: selectedCalendarType === 'google' ? '#3367d6' : '#0056cc',
+                                }
+                              }
+                            },
+                            '& .MuiPickersCalendarHeader-root': {
+                              paddingLeft: 2,
+                              paddingRight: 2,
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </LocalizationProvider>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+                    {t('event.recurrenceEndHint')}
+                  </Typography>
+                </Box>
+              </>
             )}
 
             {/* Selection summary */}
