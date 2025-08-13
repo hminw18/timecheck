@@ -67,28 +67,6 @@ const AboutUsPage = () => {
         </Box>
       </Box>
 
-      {/* Main GIF Section */}
-      <Box sx={{ mb: 6 }}>
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 4,
-            backgroundColor: 'grey.50',
-            border: '2px dashed',
-            borderColor: 'grey.300',
-            borderRadius: 2,
-            textAlign: 'center',
-            minHeight: 300,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <Typography variant="caption" color="text.secondary">
-            [GIF placeholder - TimeCheck 사용 예시]
-          </Typography>
-        </Paper>
-      </Box>
 
       {/* How to Use Section */}
       <Box sx={{ mb: 6, maxWidth: 800, mx: 'auto' }}>
