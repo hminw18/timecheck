@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Table, TableBody, TableRow, TableCell, Typography, Button, ToggleButtonGroup, ToggleButton, Box, CircularProgress, TableContainer, Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import CloseIcon from '@mui/icons-material/Close';
 import ScheduleTable from './common/ScheduleTable';
 import TimeColumn from './common/TimeColumn';
@@ -31,6 +32,7 @@ const MySchedule = ({
   onAppleLogin,
   isStackMode = false
 }) => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [currentSelectionType, setCurrentSelectionType] = useState('unavailable');
   const { dialogOpen: calendarDialogOpen, openDialog: openCalendarDialog, closeDialog } = useScheduleDialog();
@@ -284,7 +286,7 @@ const MySchedule = ({
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
       
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'flex-start' : 'center', mb: 2, gap: 2, px: isMobile ? 2 : 0 }}>
-        <Typography variant="h6">내 일정</Typography>
+        <Typography variant="h6">{t('event.mySchedule')}</Typography>
         {FEATURES.ENABLE_IF_NEEDED && (
           <ToggleButtonGroup
             value={currentSelectionType}
@@ -294,14 +296,14 @@ const MySchedule = ({
             aria-label="selection type"
           >
             <ToggleButton value="unavailable" aria-label="unavailable" sx={{ fontSize: '0.75rem', py: 0.5 }}>
-              불가능
+              {t('event.unavailable')}
             </ToggleButton>
             <ToggleButton value="ifNeeded" aria-label="if needed" sx={{ fontSize: '0.75rem', py: 0.5 }}>
-              필요한 경우
+              {t('event.ifNeeded')}
             </ToggleButton>
           </ToggleButtonGroup>
         )}
-        {(children || (!user && guestUser)) && (
+        {(children && (!isStackMode || isMobile)) && (
           <Button 
             variant="outlined" 
             size="small" 
@@ -314,7 +316,7 @@ const MySchedule = ({
               borderRadius: 2
             }}
           >
-            일정 연동
+            {t('calendar.connectSchedule')}
           </Button>
         )}
         <Button 
@@ -330,7 +332,7 @@ const MySchedule = ({
             borderRadius: 2
           }}
         >
-          저장
+          {t('common.save')}
         </Button>
       </Box>
 
@@ -357,7 +359,7 @@ const MySchedule = ({
             <Box sx={{ textAlign: 'center' }}>
               <CircularProgress size={40} />
               <Typography variant="body2" sx={{ mt: 2 }}>
-                캘린더 일정을 불러오는 중...
+                {t('event.loadingCalendar')}
               </Typography>
             </Box>
           </Box>
@@ -679,7 +681,7 @@ const MySchedule = ({
                 <Box sx={{ textAlign: 'center' }}>
                   <CircularProgress size={40} />
                   <Typography variant="body2" sx={{ mt: 2 }}>
-                    캘린더 일정을 불러오는 중...
+                    {t('event.loadingCalendar')}
                   </Typography>
                 </Box>
               </Box>
@@ -1000,7 +1002,7 @@ const MySchedule = ({
           justifyContent: 'space-between'
         }}>
           <Typography variant="h6" fontWeight={600}>
-            일정 연동
+            {t('calendar.connectSchedule')}
           </Typography>
           <IconButton
             onClick={closeDialog}

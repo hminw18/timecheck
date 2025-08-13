@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, Box, TextField, Alert, Typography, Button, CircularProgress, IconButton, Collapse } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import CloseIcon from '@mui/icons-material/Close';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -11,6 +12,7 @@ const AppleCalendarDialog = ({
   error: externalError,
   isLoading: externalLoading
 }) => {
+  const { t } = useTranslation();
   const [csrfToken, setCsrfToken] = useState('');
   const [endpoint, setEndpoint] = useState('');
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
@@ -41,7 +43,7 @@ const AppleCalendarDialog = ({
     try {
       // Enforce HTTPS for production
       if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
-        setError('보안을 위해 HTTPS 연결이 필요합니다. HTTPS로 접속해주세요.');
+        setError(t('calendar.httpsRequired'));
         return;
       }
       
@@ -69,7 +71,7 @@ const AppleCalendarDialog = ({
       setTokenGenerated(true);
     } catch (err) {
       console.error('Token generation error:', err);
-      setError('보안 연결 초기화에 실패했습니다. 다시 시도해주세요.');
+      setError(t('calendar.secureConnectionFailed'));
     } finally {
       setIsGeneratingToken(false);
     }
@@ -88,12 +90,12 @@ const AppleCalendarDialog = ({
     const appPasswordRegex = /^[a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4}$/i;
     
     if (!emailRegex.test(appleId)) {
-      setError('잘못된 Apple ID 형식입니다. 올바른 이메일 주소를 입력해주세요.');
+      setError(t('calendar.invalidAppleIdFormat'));
       return;
     }
     
     if (!appPasswordRegex.test(appPassword)) {
-      setError('잘못된 앱 암호 형식입니다. (형식: xxxx-xxxx-xxxx-xxxx)');
+      setError(t('calendar.invalidAppPasswordFormat'));
       return;
     }
     
@@ -111,7 +113,7 @@ const AppleCalendarDialog = ({
       if (!response.ok) {
         // Error - get JSON response
         const data = await response.json();
-        setError(data.error || '연결에 실패했습니다.');
+        setError(data.error || t('calendar.connectionFailed'));
         setIsSubmitting(false);
       } else {
         // Success - check for JSON response
@@ -120,12 +122,12 @@ const AppleCalendarDialog = ({
           // Redirect to settings page with success message
           window.location.href = '/settings?apple_connected=true';
         } else {
-          setError(data.error || '연결에 실패했습니다.');
+          setError(data.error || t('calendar.connectionFailed'));
           setIsSubmitting(false);
         }
       }
     } catch (err) {
-      setError('연결 중 오류가 발생했습니다.');
+      setError(t('calendar.connectionError'));
       setIsSubmitting(false);
     }
   };
@@ -150,7 +152,7 @@ const AppleCalendarDialog = ({
         pb: 1
       }}>
         <Typography variant="h6" fontWeight={600}>
-          Apple Calendar 연동
+          {t('calendar.appleCalendarConnection')}
         </Typography>
         <IconButton
           onClick={onClose}
@@ -203,7 +205,7 @@ const AppleCalendarDialog = ({
                     fontWeight: 500
                   }}
                 >
-                  앱 암호
+                  {t('calendar.appPasswordLabel')}
                 </Typography>
                 <HelpOutlineIcon sx={{ fontSize: 18, color: 'primary.main' }} />
               </Box>
@@ -218,24 +220,24 @@ const AppleCalendarDialog = ({
                   borderLeftColor: 'primary.main'
                 }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                    Apple Calendar 연동을 위해 앱 암호가 필요합니다:
+                    {t('calendar.appPasswordRequired')}
                   </Typography>
                   <Box component="ol" sx={{ pl: 2, m: 0 }}>
                     <Typography component="li" variant="body2" color="text.secondary">
-                      <a 
+                      {t('calendar.appleIdWebsiteBefore')} <a 
                         href="https://appleid.apple.com" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         style={{ color: 'inherit', textDecoration: 'underline' }}
                       >
                         appleid.apple.com
-                      </a> 접속
+                      </a> {t('calendar.appleIdWebsiteAfter')}
                     </Typography>
                     <Typography component="li" variant="body2" color="text.secondary">
-                      "로그인 및 보안" → "앱 암호" 메뉴
+                      {t('calendar.securityMenu')}
                     </Typography>
                     <Typography component="li" variant="body2" color="text.secondary">
-                      "+" 버튼으로 새 앱 암호 생성
+                      {t('calendar.generatePassword')}
                     </Typography>
                   </Box>
                 </Box>
@@ -266,7 +268,7 @@ const AppleCalendarDialog = ({
               
               <TextField
                 fullWidth
-                placeholder="앱 암호 (xxxx-xxxx-xxxx-xxxx)"
+                placeholder={t('calendar.appPasswordPlaceholder')}
                 type="password"
                 name="appSpecificPassword"
                 value={appPassword}
@@ -305,10 +307,10 @@ const AppleCalendarDialog = ({
                 {externalLoading || isSubmitting ? (
                   <>
                     <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                    연결 중...
+                    {t('calendar.connecting')}
                   </>
                 ) : (
-                  'Apple Calendar 연결'
+                  t('calendar.connectAppleCalendar')
                 )}
               </Button>
             </Box>

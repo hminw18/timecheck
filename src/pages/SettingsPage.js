@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Box, Button, IconButton, Snackbar, List, ListItem, ListItemIcon, ListItemText, ListItemSecondaryAction, Chip, Divider, TextField, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Typography, Box, Button, IconButton, List, ListItem, ListItemIcon, ListItemText, ListItemSecondaryAction, Chip, Divider, TextField, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
 import EditIcon from '@mui/icons-material/Edit';
@@ -10,6 +11,7 @@ import AddIcon from '@mui/icons-material/Add';
 import FixedSchedule from '../components/FixedSchedule';
 import CalendarSelectionDialog from '../components/CalendarSelectionDialog';
 import AppleCalendarDialog from '../components/AppleCalendarDialog';
+import Toast from '../components/Toast';
 import { useEventData } from '../hooks/useEventData';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
@@ -21,6 +23,7 @@ import { useGoogleOAuth } from '../contexts/GoogleOAuthContext';
 import { Navigate } from 'react-router-dom';
 
 const SettingsPage = () => {
+  const { t } = useTranslation();
   const { user, isLoading } = useAuth();
   const { fixedSchedule, handleSaveFixedSchedule } = useEventData(null, user);
   
@@ -28,6 +31,7 @@ const SettingsPage = () => {
   const { 
     isConnected: googleConnected, 
     isConnecting: googleConnecting, 
+    googleUser,
     connect: connectGoogle, 
     disconnect: disconnectGoogle,
     checkConnectionStatus,
@@ -58,9 +62,14 @@ const SettingsPage = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [editedName, setEditedName] = useState('');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
   const [deleteAccountDialog, setDeleteAccountDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Show toast helper
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
   
   
   
@@ -75,27 +84,15 @@ const SettingsPage = () => {
       // Check for calendar connection results from URL
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('apple_connected') === 'true') {
-        setSnackbar({ 
-          open: true, 
-          message: 'Apple Calendar가 성공적으로 연동되었습니다.', 
-          severity: 'success' 
-        });
+        showToast(t('toast.appleCalendarConnected'), 'success');
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (urlParams.get('apple_error')) {
-        setSnackbar({ 
-          open: true, 
-          message: urlParams.get('apple_error'), 
-          severity: 'error' 
-        });
+        showToast(urlParams.get('apple_error'), 'error');
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
       } else if (urlParams.get('google_connected') === 'true') {
-        setSnackbar({ 
-          open: true, 
-          message: 'Google Calendar가 연동되었습니다.', 
-          severity: 'success' 
-        });
+        showToast(t('toast.googleCalendarConnected'), 'success');
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -107,11 +104,7 @@ const SettingsPage = () => {
   // Show Google OAuth errors in Snackbar
   useEffect(() => {
     if (googleOAuthError) {
-      setSnackbar({ 
-        open: true, 
-        message: googleOAuthError, 
-        severity: 'error' 
-      });
+      showToast(googleOAuthError, 'error');
     }
   }, [googleOAuthError]);
 
@@ -123,23 +116,15 @@ const SettingsPage = () => {
   const handleGoogleDisconnect = async () => {
     try {
       await disconnectGoogle();
-      setSnackbar({ 
-        open: true, 
-        message: 'Google Calendar 연동이 해제되었습니다.', 
-        severity: 'success' 
-      });
+      showToast(t('toast.googleCalendarDisconnected'), 'success');
     } catch (error) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Google Calendar 연동 해제에 실패했습니다.', 
-        severity: 'error' 
-      });
+      showToast(t('toast.googleCalendarDisconnectFailed'), 'error');
     }
   };
   
   const handleSaveName = async () => {
     if (!editedName.trim()) {
-      setSnackbar({ open: true, message: '이름을 입력해주세요.', severity: 'error' });
+      showToast(t('toast.enterName'), 'error');
       return;
     }
     
@@ -156,9 +141,9 @@ const SettingsPage = () => {
       
       setDisplayName(editedName.trim());
       setIsEditingName(false);
-      setSnackbar({ open: true, message: '이름이 변경되었습니다.', severity: 'success' });
+      showToast(t('toast.nameChanged'), 'success');
     } catch (error) {
-      // Console statement removed for productionsetSnackbar({ open: true, message: '이름 변경 중 오류가 발생했습니다.', severity: 'error' });
+      showToast(t('toast.nameChangeError'), 'error');
     }
   };
   
@@ -183,17 +168,17 @@ const SettingsPage = () => {
       // 2. Delete Firebase Auth user (this will also sign out)
       await deleteUser(user);
       
-      setSnackbar({ open: true, message: '계정이 성공적으로 삭제되었습니다.', severity: 'success' });
+      showToast(t('toast.accountDeleted'), 'success');
       
     } catch (error) {
       console.error('계정 삭제 오류:', error);
-      let errorMessage = '계정 삭제 중 오류가 발생했습니다.';
+      let errorMessage = t('toast.accountDeleteError');
       
       if (error.code === 'auth/requires-recent-login') {
-        errorMessage = '보안을 위해 다시 로그인한 후 계정을 삭제해주세요.';
+        errorMessage = t('toast.recentLoginRequired');
       }
       
-      setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+      showToast(errorMessage, 'error');
     } finally {
       setIsDeleting(false);
       setDeleteAccountDialog(false);
@@ -223,11 +208,11 @@ const SettingsPage = () => {
           {/* User Profile Section */}
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">프로필</Typography>
+              <Typography variant="h6">{t('settings.profile')}</Typography>
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="body1" color="text.secondary">Name:</Typography>
+              <Typography variant="body1" color="text.secondary">{t('settings.name')}:</Typography>
               {isEditingName ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
                   <TextField
@@ -273,7 +258,7 @@ const SettingsPage = () => {
             
             {user?.email && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
-                <Typography variant="body1" color="text.secondary">Email:</Typography>
+                <Typography variant="body1" color="text.secondary">{t('settings.email')}:</Typography>
                 <Typography variant="body1">{user.email}</Typography>
               </Box>
             )}
@@ -292,7 +277,7 @@ const SettingsPage = () => {
               mb: 2
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Typography variant="h6">캘린더 연동</Typography>
+                <Typography variant="h6">{t('settings.calendarIntegration')}</Typography>
                 <IconButton 
                   size="small" 
                   onClick={() => setCalendarSelectionDialog(true)}
@@ -302,7 +287,7 @@ const SettingsPage = () => {
                 </IconButton>
               </Box>
               <Typography variant="body2" color="text.secondary">
-                캘린더를 연동하면 일정 작성 시 기존 일정을 자동으로 불러올 수 있습니다.
+                {t('settings.calendarDescription')}
               </Typography>
             </Box>
             
@@ -320,13 +305,13 @@ const SettingsPage = () => {
                   <GoogleIcon sx={{ fontSize: 24 }} />
                 </ListItemIcon>
                 <ListItemText 
-                  primary={googleConnected ? (user?.email || 'Google Calendar') : 'Google Calendar'}
+                  primary={googleConnected ? (googleUser?.email || 'Google Calendar') : 'Google Calendar'}
                   secondary={
                     googleConnected 
-                      ? '연동됨' 
+                      ? `${t('calendar.connected')} ${googleUser?.name ? `- ${googleUser.name}` : ''}` 
                       : user?.providerData[0]?.providerId === 'google.com' 
-                        ? '연동 가능'
-                        : 'Google 계정으로 로그인 필요'
+                        ? t('settings.availableForConnection')
+                        : t('calendar.googleLoginRequired')
                   }
                   primaryTypographyProps={{ fontSize: '0.95rem' }}
                   secondaryTypographyProps={{ fontSize: '0.85rem' }}
@@ -349,10 +334,10 @@ const SettingsPage = () => {
                       disabled={googleConnecting}
                       sx={{ textTransform: 'none' }}
                     >
-                      {googleConnecting ? '연동 중...' : '연동하기'}
+                      {googleConnecting ? t('settings.connecting') : t('calendar.connect')}
                     </Button>
                   ) : (
-                    <Chip label="사용 불가" size="small" variant="outlined" />
+                    <Chip label={t('calendar.notAvailable')} size="small" variant="outlined" />
                   )}
                 </ListItemSecondaryAction>
               </ListItem>
@@ -371,7 +356,7 @@ const SettingsPage = () => {
                 </ListItemIcon>
                 <ListItemText 
                   primary={appleCalendarConnected ? (appleCalendarUser?.appleId || 'Apple Calendar') : 'Apple Calendar'}
-                  secondary={appleCalendarConnected ? '연동됨' : '앱 암호로 연동 가능'}
+                  secondary={appleCalendarConnected ? t('calendar.connected') : t('calendar.appPasswordRequired')}
                   primaryTypographyProps={{ fontSize: '0.95rem' }}
                   secondaryTypographyProps={{ fontSize: '0.85rem' }}
                 />
@@ -391,7 +376,7 @@ const SettingsPage = () => {
                       onClick={() => setAppleDialogOpen(true)}
                       sx={{ textTransform: 'none' }}
                     >
-                      연동하기
+                      {t('calendar.connect')}
                     </Button>
                   )}
                 </ListItemSecondaryAction>
@@ -410,9 +395,9 @@ const SettingsPage = () => {
               justifyContent: 'space-between',
               mb: 2
             }}>
-              <Typography variant="h6">고정 일정</Typography>
+              <Typography variant="h6">{t('settings.fixedSchedule')}</Typography>
               <Typography variant="body2" color="text.secondary">
-                매주 반복되는 불가능한 시간대를 설정하세요.
+                {t('settings.fixedScheduleDescription')}
               </Typography>
             </Box>
             <FixedSchedule 
@@ -425,9 +410,9 @@ const SettingsPage = () => {
           
           {/* Account Deletion Section */}
           <Box>
-            <Typography variant="h6" sx={{ mb: 2 }}>계정 삭제</Typography>
+            <Typography variant="h6" sx={{ mb: 2 }}>{t('settings.accountDeletion')}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              계정을 삭제하면 프로필 정보, 캘린더 연동 설정, 고정 일정 설정이 영구적으로 삭제됩니다.
+              {t('settings.accountDeletionDescription')}
             </Typography>
             <Button
               variant="outlined"
@@ -440,28 +425,19 @@ const SettingsPage = () => {
                 textTransform: 'none'
               }}
             >
-              계정 삭제
+              {t('settings.deleteAccount')}
             </Button>
           </Box>
         </Box>
       </Box>
       
-      {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={3000} 
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%', maxWidth: 400 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* Toast for notifications */}
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
 
       {/* Calendar Selection Dialog */}
       <CalendarSelectionDialog
@@ -470,11 +446,7 @@ const SettingsPage = () => {
         onGoogleSelect={handleGoogleConnect}
         onAppleSelect={() => setAppleDialogOpen(true)}
         isGoogleUser={user?.providerData[0]?.providerId === 'google.com'}
-        showAlert={(message) => setSnackbar({ 
-          open: true, 
-          message: message, 
-          severity: 'info' 
-        })}
+        showAlert={(message) => showToast(message, 'error')}
       />
 
       {/* Apple Calendar Dialog */}
@@ -505,7 +477,7 @@ const SettingsPage = () => {
           pb: 1
         }}>
           <Typography variant="h6" fontWeight={600}>
-            계정 삭제
+            {t('settings.deleteConfirmTitle')}
           </Typography>
           <IconButton
             onClick={() => setDeleteAccountDialog(false)}
@@ -520,10 +492,10 @@ const SettingsPage = () => {
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Typography variant="body1" sx={{ mb: 1 }}>
-            정말로 계정을 삭제하시겠습니까?
+            {t('settings.deleteConfirmMessage')}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            프로필 정보, 캘린더 연동 설정, 고정 일정 설정이 영구적으로 삭제됩니다.
+            {t('settings.deleteConfirmDescription')}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 2, gap: 1 }}>
@@ -537,7 +509,7 @@ const SettingsPage = () => {
               fontWeight: 500
             }}
           >
-            취소
+            {t('common.cancel')}
           </Button>
           <Button 
             onClick={handleDeleteAccount}
@@ -555,7 +527,7 @@ const SettingsPage = () => {
               }
             }}
           >
-            {isDeleting ? '삭제 중...' : '삭제'}
+            {isDeleting ? t('settings.deleting') : t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>

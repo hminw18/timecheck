@@ -1,19 +1,25 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Button, Box, Alert, Snackbar } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Button, Box } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import ScheduleTable from './common/ScheduleTable';
 import TimeColumn from './common/TimeColumn';
-import useSnackbar from '../hooks/useSnackbar';
+import Toast from './Toast';
 import { COLORS } from '../utils/constants';
 import ScheduleCell from './ScheduleCell';
 import { buildCoordinatesCache } from '../utils/coordinateUtils';
 import useDragSelection from '../hooks/useDragSelection';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+const WEEKDAY_LABELS = ['days.mon', 'days.tue', 'days.wed', 'days.thu', 'days.fri', 'days.sat', 'days.sun'];
 
 const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false }) => {
+  const { t } = useTranslation();
   const [selectedCells, setSelectedCells] = useState(new Set(fixedSchedule));
-  const { snackbarOpen, snackbarMessage, showSnackbar, hideSnackbar } = useSnackbar();
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
   
   // Update selectedCells when fixedSchedule prop changes
   useEffect(() => {
@@ -121,9 +127,9 @@ const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false
   const handleSave = async () => {
     const result = await onSave(Array.from(selectedCells));
     if (result.success) {
-      showSnackbar('고정 일정이 저장되었습니다!');
+      showToast(t('calendar.fixedScheduleSaved'), 'success');
     } else {
-      showSnackbar('저장 중 오류가 발생했습니다.', 'error');
+      showToast(t('calendar.saveFailed'), 'error');
     }
   };
 
@@ -133,10 +139,10 @@ const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false
 
       <Box sx={{ display: 'flex', gap: 1, mb: 2, justifyContent: 'flex' }}>
         <Button variant="outlined" size="small" onClick={() => setSelectedCells(new Set())} sx={{ borderRadius: 2 }}>
-          초기화
+          {t('calendar.reset')}
         </Button>
         <Button variant="contained" size="small" onClick={handleSave} disableElevation sx={{ borderRadius: 2 }}>
-          저장
+          {t('common.save')}
         </Button>
       </Box>
 
@@ -187,7 +193,7 @@ const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false
                         lineHeight: 1.2
                       }}
                     >
-                      {WEEKDAY_LABELS[index]}
+                      {t(WEEKDAY_LABELS[index])}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -270,17 +276,12 @@ const FixedSchedule = React.memo(({ fixedSchedule = [], onSave, isMobile = false
         </Box>
       </ScheduleTable>
 
-      <Snackbar 
-        open={snackbarOpen} 
-        autoHideDuration={3000} 
-        onClose={hideSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert onClose={hideSnackbar} severity="success" sx={{ width: '100%', maxWidth: 400 }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
 
     </Box>
   );

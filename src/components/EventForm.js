@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useTranslation } from 'react-i18next';
 import {
   TextField,
   Button,
@@ -10,8 +11,6 @@ import {
   Chip,
   IconButton,
   InputAdornment,
-  Snackbar,
-  Alert,
 } from "@mui/material";
 import { Select, MenuItem, FormControl, InputLabel } from "@mui/material";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -23,15 +22,21 @@ import ClearIcon from '@mui/icons-material/Clear';
 import dayjs from "../config/dayjsConfig";
 import CustomDatePicker from "./DatePicker";
 import { validateEventTitle } from "../utils/validation";
+import Toast from './Toast';
 
 export default function EventForm({ setEventDetails, isMobile }) {
-  const [title, setTitle] = useState("우리의 이벤트");
+  const { t, i18n } = useTranslation();
+  const [title, setTitle] = useState(t('event.defaultTitle'));
   const [eventType, setEventType] = useState("date"); // "date" or "day"
   const [dates, setDates] = useState([]);
   const [selectedDays, setSelectedDays] = useState([]); // For day-based events
   const [startTime, setStartTime] = useState(dayjs().set("hour", 9).set("minute", 0));
   const [endTime, setEndTime] = useState(dayjs().set("hour", 17).set("minute", 0));
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'error' });
+
+  const showToast = (message, severity = 'error') => {
+    setToast({ open: true, message, severity });
+  };
 
   // Drag state management
   const [isDragging, setIsDragging] = useState(false);
@@ -40,13 +45,13 @@ export default function EventForm({ setEventDetails, isMobile }) {
   const hasDragged = useRef(false); // Track if we actually dragged
 
   const daysOfWeek = [
-    { value: 'Mon', label: '월' },
-    { value: 'Tue', label: '화' },
-    { value: 'Wed', label: '수' },
-    { value: 'Thu', label: '목' },
-    { value: 'Fri', label: '금' },
-    { value: 'Sat', label: '토' },
-    { value: 'Sun', label: '일' }
+    { value: 'Mon', label: t('days.mon') },
+    { value: 'Tue', label: t('days.tue') },
+    { value: 'Wed', label: t('days.wed') },
+    { value: 'Thu', label: t('days.thu') },
+    { value: 'Fri', label: t('days.fri') },
+    { value: 'Sat', label: t('days.sat') },
+    { value: 'Sun', label: t('days.sun') }
   ];
 
   const [startDate, endDate] = useMemo(() => {
@@ -168,13 +173,13 @@ export default function EventForm({ setEventDetails, isMobile }) {
     // Validate event title
     const titleValidation = validateEventTitle(title);
     if (!titleValidation.isValid) {
-      setSnackbar({ open: true, message: titleValidation.error, severity: 'error' });
+      showToast(titleValidation.error, 'error');
       return;
     }
     
     // Validate time range
     if (startTime.hour() >= endTime.hour()) {
-      setSnackbar({ open: true, message: '종료 시간은 시작 시간보다 늦어야 합니다.', severity: 'error' });
+      showToast(t('event.endTimeAfterStart'), 'error');
       return;
     }
     
@@ -193,12 +198,6 @@ export default function EventForm({ setEventDetails, isMobile }) {
     });
   };
 
-  const handleSnackbarClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setSnackbar({ ...snackbar, open: false });
-  };
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -209,7 +208,7 @@ export default function EventForm({ setEventDetails, isMobile }) {
           variant="outlined"
           size="small"
           fullWidth
-          placeholder="이벤트 제목을 입력해 주세요"
+          placeholder={t('event.titlePlaceholder')}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           autoComplete="off"
@@ -256,11 +255,11 @@ export default function EventForm({ setEventDetails, isMobile }) {
               >
                 <ToggleButton value="date">
                   <CalendarMonthIcon sx={{ mr: 1, fontSize: 18 }} />
-                  특정 날짜
+                  {t('event.specificDates')}
                 </ToggleButton>
                 <ToggleButton value="day">
                   <EventRepeatIcon sx={{ mr: 1, fontSize: 18 }} />
-                  매주 반복
+                  {t('event.weeklyRepeat')}
                 </ToggleButton>
               </ToggleButtonGroup>
             </Box>
@@ -281,7 +280,7 @@ export default function EventForm({ setEventDetails, isMobile }) {
                 gap: 2 
               }}>
                 <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                  반복할 요일 선택
+                  {t('event.selectDays')}
                 </Typography>
                 <Box sx={{ 
                   display: 'flex', 
@@ -354,16 +353,20 @@ export default function EventForm({ setEventDetails, isMobile }) {
                   }}
                 >
                   {Array.from({ length: 24 }, (_, i) => {
-                    const period = i < 12 ? '오전' : '오후';
+                    const period = i < 12 ? t('event.am') : t('event.pm');
                     const displayHour = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+                    const isKorean = i18n.language === 'ko';
                     return (
                       <MenuItem key={i} value={i}>
-                        {`${i}시 (${period} ${displayHour}시)`}
+                        {i18n.language.startsWith('ko') 
+                          ? `${period} ${displayHour}시 (${i}:00)`
+                          : `${displayHour} ${period} (${i}:00)`
+                        }
                       </MenuItem>
                     );
                   })}
                 </Select>
-                <Typography sx={{ flexShrink: 0 }}>부터</Typography>
+                <Typography sx={{ flexShrink: 0 }}>{t('event.from')}</Typography>
               </Box>
               
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'nowrap' }}>
@@ -388,20 +391,24 @@ export default function EventForm({ setEventDetails, isMobile }) {
                   }}
                 >
                   {Array.from({ length: 24 }, (_, i) => {
-                    const period = i < 12 ? '오전' : '오후';
+                    const period = i < 12 ? t('event.am') : t('event.pm');
                     const displayHour = i === 0 ? 12 : (i > 12 ? i - 12 : i);
+                    const isKorean = i18n.language === 'ko';
                     return (
                       <MenuItem 
                         key={i} 
                         value={i}
                         disabled={i <= startTime.hour()}
                       >
-                        {`${i}시 (${period} ${displayHour}시)`}
+                        {i18n.language.startsWith('ko') 
+                          ? `${period} ${displayHour}시 (${i}:00)`
+                          : `${displayHour} ${period} (${i}:00)`
+                        }
                       </MenuItem>
                     );
                   })}
                 </Select>
-                <Typography sx={{ flexShrink: 0 }}>까지</Typography>
+                <Typography sx={{ flexShrink: 0 }}>{t('event.to')}</Typography>
               </Box>
             </Box>
           </Grid>
@@ -423,12 +430,12 @@ export default function EventForm({ setEventDetails, isMobile }) {
               }}
             >
               {!isTitleValid 
-                ? "이벤트 제목을 입력해 주세요"
+                ? t('event.enterTitle')
                 : !isDateSelected 
                   ? (eventType === "date" 
-                    ? "날짜를 선택해 주세요" 
-                    : "요일을 선택해 주세요")
-                  : "이벤트 만들기"}
+                    ? t('event.selectDate') 
+                    : t('event.selectDay'))
+                  : t('event.createEvent')}
             </Button>
           </Box>
         )}
@@ -463,26 +470,21 @@ export default function EventForm({ setEventDetails, isMobile }) {
             }}
           >
             {!isTitleValid 
-              ? "이벤트 제목을 입력해 주세요"
+              ? t('event.enterTitle')
               : !isDateSelected 
                 ? (eventType === "date" 
-                  ? "날짜를 선택해 주세요" 
-                  : "요일을 선택해 주세요")
-                : "이벤트 만들기"}
+                  ? t('event.selectDate') 
+                  : t('event.selectDay'))
+                : t('event.createEvent')}
           </Button>
         )}
         
-        <Snackbar 
-          open={snackbar.open} 
-          autoHideDuration={4000} 
-          onClose={handleSnackbarClose}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-          sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-        >
-          <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%', maxWidth: 400 }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
+        <Toast
+          open={toast.open}
+          message={toast.message}
+          severity={toast.severity}
+          onClose={() => setToast({ ...toast, open: false })}
+        />
       </Box>
     </LocalizationProvider>
   );

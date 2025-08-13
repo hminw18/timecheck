@@ -1,11 +1,13 @@
 import React from 'react';
 import { Dialog, DialogContent, Button, Box, Typography, Divider, IconButton, TextField } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import CloseIcon from '@mui/icons-material/Close';
 import GoogleIcon from '@mui/icons-material/Google';
 import AppleIcon from '@mui/icons-material/Apple';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginDialog = ({ open, onClose }) => {
+  const { t } = useTranslation();
   const { signIn, signInWithApple } = useAuth();
 
   const handleGoogleSignIn = async () => {
@@ -33,7 +35,7 @@ const LoginDialog = ({ open, onClose }) => {
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" fontWeight={600}>
-          로그인
+          {t('auth.signIn')}
         </Typography>
         <IconButton onClick={onClose} size="small">
           <CloseIcon />
@@ -68,7 +70,7 @@ const LoginDialog = ({ open, onClose }) => {
                 }
               }}
             >
-              Apple로 로그인
+              {t('auth.signInWithApple')}
             </Button>
 
             {/* Google Sign In Button - Matching style consistency */}
@@ -96,12 +98,12 @@ const LoginDialog = ({ open, onClose }) => {
                 }
               }}
             >
-              Google로 로그인
+              {t('auth.signInWithGoogle')}
             </Button>
           </Box>
 
           <Typography variant="caption" color="text.secondary" align="center" sx={{ mt: 1 }}>
-            로그인하면 캘린더를 연동해서 일정을 바로 불러올 수 있습니다
+            {t('auth.loginForCalendar')}
           </Typography>
         </Box>
       </DialogContent>

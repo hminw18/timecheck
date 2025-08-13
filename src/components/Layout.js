@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, Typography, Container, Box, Avatar, Menu, MenuItem, IconButton, Divider, ListItemIcon, ListItemText, Snackbar, Alert } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Box, Avatar, Menu, MenuItem, IconButton, Divider, ListItemIcon, ListItemText } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import EventIcon from '@mui/icons-material/Event';
 import SettingsIcon from '@mui/icons-material/Settings';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -9,16 +10,20 @@ import LoginDialog from './LoginDialog';
 import SuggestionDialog from './SuggestionDialog';
 import CalendarSelectionDialog from './CalendarSelectionDialog';
 import AppleCalendarDialog from './AppleCalendarDialog';
+import Toast from './Toast';
 import { useCalendarIntegration } from '../hooks/useCalendarIntegration';
 
 const Layout = ({ children, eventDetails }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut, signIn, authError, setAuthError, isFirstLogin, clearFirstLogin } = useAuth();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('error');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'error' });
+
+  const showToast = (message, severity = 'error') => {
+    setToast({ open: true, message, severity });
+  };
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
   
@@ -34,9 +39,7 @@ const Layout = ({ children, eventDetails }) => {
 
   useEffect(() => {
     if (authError) {
-      setSnackbarMessage(authError);
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      showToast(authError, 'error');
       setAuthError(null); // Clear error after showing
     }
   }, [authError, setAuthError]);
@@ -90,20 +93,10 @@ const Layout = ({ children, eventDetails }) => {
                   }} 
                 />
               </Link>
-              {location.pathname === '/' && (
-                <Typography 
-                  variant="caption" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontSize: { xs: '0.7rem', sm: '0.8rem' },
-                    ml: { xs: 0.5, sm: 0.5},
-                    mt: { xs: 0, sm: 1 }
-                  }}
-                >
-                  쉽고 빠른 모임 일정 정하기
-                </Typography>
-              )}
+              {location.pathname === '/'}
             </Box>
+            
+            
             {user ? (
               <Box>
                 <IconButton 
@@ -219,7 +212,7 @@ const Layout = ({ children, eventDetails }) => {
                           fontWeight: 500
                         }}
                       >
-                        내 이벤트
+                        {t('navigation.myEvents')}
                       </ListItemText>
                     </MenuItem>
                     <MenuItem 
@@ -244,10 +237,11 @@ const Layout = ({ children, eventDetails }) => {
                           fontWeight: 500
                         }}
                       >
-                        설정
+                        {t('navigation.settings')}
                       </ListItemText>
                     </MenuItem>
                   </Box>
+                  
                   <Divider sx={{ my: 0.25 }} />
                   <Box sx={{ py: 0.25 }}>
                     <MenuItem 
@@ -273,27 +267,29 @@ const Layout = ({ children, eventDetails }) => {
                           color: 'error.main'
                         }}
                       >
-                        로그아웃
+                        {t('auth.signOut')}
                       </ListItemText>
                     </MenuItem>
                   </Box>
                 </Menu>
               </Box>
             ) : (
-              <Typography
-                variant="body2"
-                onClick={() => setLoginDialogOpen(true)}
-                sx={{
-                  cursor: 'pointer',
-                  color: '#1976d2',
-                  fontWeight: 500,
-                  '&:hover': {
-                    textDecoration: 'underline'
-                  }
-                }}
-              >
-                로그인
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography
+                  variant="body2"
+                  onClick={() => setLoginDialogOpen(true)}
+                  sx={{
+                    cursor: 'pointer',
+                    color: '#1976d2',
+                    fontWeight: 500,
+                    '&:hover': {
+                      textDecoration: 'underline'
+                    }
+                  }}
+                >
+                  {t('auth.signIn')}
+                </Typography>
+              </Box>
             )}
           </Toolbar>
         </Container>
@@ -324,6 +320,25 @@ const Layout = ({ children, eventDetails }) => {
             © 2025 TimeCheck
           </Typography>
           <Link 
+            to="/about-us" 
+            style={{ 
+              textDecoration: 'none'
+            }}
+          >
+            <Typography 
+              variant="caption" 
+              color="text.secondary"
+              sx={{
+                fontSize: { xs: '0.65rem', sm: '0.75rem' },
+                '&:hover': {
+                  textDecoration: 'underline'
+                }
+              }}
+            >
+              {t('navigation.aboutUs')}
+            </Typography>
+          </Link>
+          <Link 
             to="/privacy-policy" 
             style={{ 
               textDecoration: 'none'
@@ -339,7 +354,7 @@ const Layout = ({ children, eventDetails }) => {
                 }
               }}
             >
-              개인정보처리방침
+              Privacy Policy
             </Typography>
           </Link>
           <Typography 
@@ -356,7 +371,7 @@ const Layout = ({ children, eventDetails }) => {
               }
             }}
           >
-            피드백
+            Feedback
           </Typography>
         </Box>
       </Box>
@@ -385,9 +400,7 @@ const Layout = ({ children, eventDetails }) => {
         }}
         isGoogleUser={user?.providerData[0]?.providerId === 'google.com'}
         showAlert={(message) => {
-          setSnackbarMessage(message);
-          setSnackbarSeverity('info');
-          setSnackbarOpen(true);
+          showToast(message, 'info');
         }}
       />
 
@@ -400,21 +413,12 @@ const Layout = ({ children, eventDetails }) => {
         isLoading={false}
       />
       
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={3000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert 
-          onClose={() => setSnackbarOpen(false)} 
-          severity={snackbarSeverity}
-          sx={{ width: '100%', maxWidth: 400 }}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
     </Box>
   );
 };

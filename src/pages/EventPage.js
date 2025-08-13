@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Typography, Box, CircularProgress, Alert, Snackbar, Button, IconButton, Tooltip, ListItem, List, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { Typography, Box, CircularProgress, Button, IconButton, Tooltip, ListItem, List, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ShareIcon from '@mui/icons-material/Share';
 import AddIcon from '@mui/icons-material/Add';
@@ -11,6 +12,7 @@ import GroupSchedule from '../components/GroupSchedule';
 import CalendarSelectionDialog from '../components/CalendarSelectionDialog';
 import AppleCalendarDialog from '../components/AppleCalendarDialog';
 import LoginDialog from '../components/LoginDialog';
+import Toast from '../components/Toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useGoogleOAuth } from '../contexts/GoogleOAuthContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -34,10 +36,11 @@ const EventPage = ({
   respondedUsers,
   fixedSchedule
 }) => {
+  const { t } = useTranslation();
   const { user, signIn, signInWithApple } = useAuth();
   const [shouldShowCalendarDialog, setShouldShowCalendarDialog] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
-  const { isConnected: googleConnected } = useGoogleOAuth();
+  const { isConnected: googleConnected, googleUser } = useGoogleOAuth();
   const {
     // Google Calendar
     isLoadingGoogle,
@@ -75,22 +78,25 @@ const EventPage = ({
   const [appleCalendarChecked, setAppleCalendarChecked] = useState(false);
   const [fixedScheduleChecked, setFixedScheduleChecked] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
   const [hasLoadedExistingSchedule, setHasLoadedExistingSchedule] = useState(false);
   const [hasAutoLoadedCalendars, setHasAutoLoadedCalendars] = useState(false);
   const [hasLoadedGoogleCalendar, setHasLoadedGoogleCalendar] = useState(false);
   const containerRef = useRef(null);
   const navigate = useNavigate();
   
+  // Show toast helper
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
+
   // Clipboard copy with fallback for iOS
   const copyToClipboard = (text) => {
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text)
         .then(() => {
-          setSnackbarMessage('링크가 복사되었습니다!');
-          setSnackbarOpen(true);
+          showToast(t('toast.linkCopied'), 'success');
         })
         .catch(() => {
           fallbackCopy(text);
@@ -121,8 +127,7 @@ const EventPage = ({
     try {
       const successful = document.execCommand('copy');
       if (successful) {
-        setSnackbarMessage('링크가 복사되었습니다!');
-        setSnackbarOpen(true);
+        showToast(t('toast.linkCopied'), 'success');
       }
     } catch (err) {
       // Console statement removed for production
@@ -230,7 +235,7 @@ const EventPage = ({
         // Console statement removed for production
         const start = dayjs(event.start);
         const end = dayjs(event.end);
-        const eventTitle = event.title || '일정';
+        const eventTitle = event.title || t('event.event');
         const dayOfWeek = dayOfWeekMap[start.day()];
         
         // Console statement removed for production
@@ -286,7 +291,7 @@ const EventPage = ({
       events.forEach(event => {
         const start = dayjs(event.start);
         const end = dayjs(event.end);
-        const eventTitle = event.title || '일정';
+        const eventTitle = event.title || t('event.event');
         
         // Round start time down to nearest 30-minute interval
         let roundedStart = start;
@@ -580,11 +585,10 @@ const EventPage = ({
     }
   }, [user]);
 
-  // Show calendar import errors in Snackbar
+  // Show calendar import errors in Toast
   useEffect(() => {
     if (calendarImportError) {
-      setSnackbarMessage(calendarImportError);
-      setSnackbarOpen(true);
+      showToast(calendarImportError, 'error');
     }
   }, [calendarImportError]);
 
@@ -674,14 +678,14 @@ const EventPage = ({
               onClick={() => copyToClipboard(window.location.href)}
               sx={{ fontSize: '0.75rem' }}
             >
-              링크 복사
+              {t('event.copyLink')}
             </Button>
             <Button
               variant="outlined"
               size="small"
               startIcon={<ShareIcon />}
               onClick={() => {
-                const shareText = `${eventDetails.title}\n\n캘린더 연동 기능을 사용해 TimeCheck에서 쉽고 빠르게 일정을 등록하세요!\n\n${window.location.href}`;
+                const shareText = `${eventDetails.title}\n\n${t('app.description')}\n\n${window.location.href}`;
                 const shareData = {
                   title: eventDetails.title,
                   text: shareText
@@ -694,19 +698,17 @@ const EventPage = ({
                     navigator.share({
                       url: window.location.href
                     }).catch(err2 => {
-                      // Console statement removed for productionsetSnackbarMessage('공유 기능을 사용할 수 없습니다.');
-                      setSnackbarOpen(true);
+                      showToast(t('toast.shareError'), 'error');
                     });
                   });
                 } else {
                   // If no share API, show message to copy link manually
-                  setSnackbarMessage('공유 기능을 지원하지 않는 브라우저입니다. 링크 복사를 사용해주세요.');
-                  setSnackbarOpen(true);
+                  showToast(t('toast.shareNotSupported'), 'error');
                 }
               }}
               sx={{ fontSize: '0.75rem' }}
             >
-              공유
+              {t('event.share')}
             </Button>
           </Box>
         </Box>
@@ -758,9 +760,9 @@ const EventPage = ({
                 <Box sx={{ height: '100%', mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <Typography variant="subtitle2" sx={{ color: 'text.secondary'}}>
-                      캘린더
+                      {t('calendar.integration')}
                     </Typography>
-                    <Tooltip title="캘린더 추가">
+                    <Tooltip title={t('common.add')}>
                       <IconButton 
                         onClick={handleAddCalendar} 
                         sx={{ 
@@ -776,7 +778,7 @@ const EventPage = ({
                   
                   {!googleConnected && !appleCalendarConnected && (!fixedSchedule || fixedSchedule.length === 0) ? (
                     <Typography variant="body2" color="text.secondary">
-                      연동된 캘린더가 없습니다
+                      {t('calendar.notConnected')}
                     </Typography>
                   ) : (
                     <List sx={{ pt: 0, pl: 0 }}>
@@ -802,7 +804,7 @@ const EventPage = ({
                               <GoogleIcon sx={{ fontSize: 18 }} />
                             </ListItemIcon>
                             <ListItemText 
-                              primary={user?.email || 'Google'}
+                              primary={googleUser?.email || user?.email || 'Google'}
                               primaryTypographyProps={{ 
                                 variant: 'body2',
                                 sx: { fontSize: '0.875rem', overflow: 'hidden', textOverflow: 'ellipsis' }
@@ -851,9 +853,9 @@ const EventPage = ({
                   <Box sx={{ mt: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                       <Typography variant="subtitle2" sx={{ color: 'text.secondary'}}>
-                        일정
+                        {t('calendar.import')}
                       </Typography>
-                      <Tooltip title="고정 일정 설정">
+                      <Tooltip title={t('settings.fixedSchedule')}>
                         <IconButton 
                           onClick={() => navigate('/settings')} 
                           sx={{ 
@@ -888,7 +890,7 @@ const EventPage = ({
                               <ScheduleIcon sx={{ fontSize: 18 }} />
                             </ListItemIcon>
                             <ListItemText 
-                              primary="고정 일정"
+                              primary={t('calendar.fixedSchedule')}
                               primaryTypographyProps={{
                                 variant: 'body2',
                                 sx: { fontSize: '0.875rem' }
@@ -899,7 +901,7 @@ const EventPage = ({
                       </List>
                     ) : (
                       <Typography variant="body2" color="text.secondary">
-                        설정된 고정 일정이 없습니다
+                        {t('calendar.noFixedSchedule')}
                       </Typography>
                     )}
                   </Box>
@@ -961,22 +963,16 @@ const EventPage = ({
         }}
         isGoogleUser={user?.providerData?.[0]?.providerId === 'google.com'}
         showAlert={(message) => {
-          setSnackbarMessage(message);
-          setSnackbarOpen(true);
+          showToast(t('errors.loginRequired'), 'error');
         }}
       />
 
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={3000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert onClose={() => setSnackbarOpen(false)} severity="success" sx={{ width: '100%', maxWidth: 400 }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
     </Box>
   );
 };

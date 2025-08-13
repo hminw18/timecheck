@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Box, TextField, Button, Typography, Divider, IconButton } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { validateGuestName } from '../utils/validation';
 
 const GuestLogin = ({ onGuestLogin, onGoogleLogin, onAppleLogin }) => {
+  const { t } = useTranslation();
   const [guestName, setGuestName] = useState('');
   const [guestPassword, setGuestPassword] = useState('');
   const [nameError, setNameError] = useState(false);
@@ -28,14 +30,14 @@ const GuestLogin = ({ onGuestLogin, onGoogleLogin, onAppleLogin }) => {
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
             <TextField
               fullWidth
-              placeholder="이름"
+              placeholder={t('auth.name')}
               value={guestName}
               onChange={(e) => {
                 setGuestName(e.target.value);
                 setNameError(false);
               }}
               error={nameError}
-              helperText={nameError ? "이름을 확인해주세요" : ""}
+              helperText={nameError ? t('auth.checkName') : ""}
               autoFocus
               autoComplete="name"
               inputProps={{
@@ -55,7 +57,7 @@ const GuestLogin = ({ onGuestLogin, onGoogleLogin, onAppleLogin }) => {
             <TextField
               fullWidth
               type="password"
-              placeholder="비밀번호 (선택사항)"
+              placeholder={t('auth.passwordOptional')}
               value={guestPassword}
               onChange={(e) => setGuestPassword(e.target.value)}
               autoComplete="off"
@@ -88,8 +90,9 @@ const GuestLogin = ({ onGuestLogin, onGoogleLogin, onAppleLogin }) => {
             }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-              <span>게스트</span>
-              <span>로그인</span>
+              {t('auth.guestLogin').split('\n').map((line, index) => (
+                <span key={index}>{line}</span>
+              ))}
             </Box>
           </Button>
         </Box>
@@ -98,7 +101,7 @@ const GuestLogin = ({ onGuestLogin, onGoogleLogin, onAppleLogin }) => {
       <Box sx={{ mt: 3, textAlign: 'center' }}>
         <Divider sx={{ mb: 2 }}>
           <Typography variant="caption" color="text.secondary">
-            또는 로그인해서 애플, 구글 캘린더 연동하기
+            {t('auth.loginToConnectCalendar')}
           </Typography>
         </Divider>
         

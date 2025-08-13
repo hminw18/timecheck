@@ -1,19 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
-import { Box, Typography, List, ListItem, ListItemText, IconButton, CircularProgress, Button, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Snackbar, Alert } from '@mui/material';
+import { Box, Typography, List, ListItem, ListItemText, IconButton, CircularProgress, Button, Divider, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ClearIcon from '@mui/icons-material/Clear';
 import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import Toast from '../components/Toast';
 import dayjs from '../config/dayjsConfig';
 
 const MyEventsPage = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState({ open: false, eventId: null, eventTitle: '' });
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
   const navigate = useNavigate();
 
   const getDayNames = (days) => {
@@ -62,7 +67,8 @@ const MyEventsPage = () => {
         });
         setEvents(userEvents);
       } catch (error) {
-        // Console statement removed for productionsetSnackbar({ open: true, message: 'Could not fetch your events. Please try again.', severity: 'error' });
+        // Console statement removed for production
+        showToast('Could not fetch your events. Please try again.', 'error');
       }
       setLoading(false);
     };
@@ -92,9 +98,10 @@ const MyEventsPage = () => {
       await deleteDoc(doc(db, 'events', eventId));
 
       setEvents(events.filter(event => event.id !== eventId));
-      setSnackbar({ open: true, message: '이벤트가 삭제되었습니다.', severity: 'success' });
+      showToast('이벤트가 삭제되었습니다.', 'success');
     } catch (error) {
-      // Console statement removed for productionsetSnackbar({ open: true, message: '이벤트 삭제에 실패했습니다. 다시 시도해 주세요.', severity: 'error' });
+      // Console statement removed for production
+      showToast('이벤트 삭제에 실패했습니다. 다시 시도해 주세요.', 'error');
     }
   };
 
@@ -102,12 +109,6 @@ const MyEventsPage = () => {
     setDeleteDialog({ open: false, eventId: null, eventTitle: '' });
   };
 
-  const handleSnackbarClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setSnackbar({ ...snackbar, open: false });
-  };
 
   if (loading) {
     return (
@@ -260,18 +261,13 @@ const MyEventsPage = () => {
         </DialogActions>
       </Dialog>
       
-      {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%', maxWidth: 400 }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* Toast for notifications */}
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
     </Layout>
   );
 };

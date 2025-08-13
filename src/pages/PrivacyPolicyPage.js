@@ -22,7 +22,7 @@ const PrivacyPolicyPage = () => {
               1. 개인정보 수집 및 이용 목적
             </Typography>
             <Typography variant="body1" paragraph>
-              TimeCheck(이하 "서비스")는 그룹 일정 조율 서비스를 제공하기 위해 다음과 같은 개인정보를 수집 및 이용합니다:
+              TimeCheck(이하 "서비스")는 모임 일정 조율 서비스를 제공하기 위해 다음과 같은 개인정보를 수집 및 이용합니다:
             </Typography>
             <Typography variant="body1" component="ul" sx={{ pl: 3 }}>
               <li>사용자 계정 생성 및 관리</li>

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Box, CircularProgress, Snackbar, Alert } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, CircularProgress } from '@mui/material';
+import './i18n';
+import { useTranslation } from 'react-i18next';
 import HomePage from './pages/HomePage';
 import EventPage from './pages/EventPage';
 import { useEventData } from './hooks/useEventData';
@@ -9,7 +11,9 @@ import { GoogleOAuthProvider } from './contexts/GoogleOAuthContext';
 import MyEventsPage from './pages/MyEventsPage';
 import SettingsPage from './pages/SettingsPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import AboutUsPage from './pages/AboutUsPage';
 import Layout from './components/Layout';
+import Toast from './components/Toast';
 
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './config/theme';
@@ -32,7 +36,11 @@ function EventPageWrapper() {
     fixedSchedule,
   } = useEventData(eventId, user);
 
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
 
   const handleSaveWrapper = async (guestUserData) => {
     // If guestUserData is provided, pass it to handleSave
@@ -40,16 +48,10 @@ function EventPageWrapper() {
       await handleSave(guestUserData) : 
       await handleSave();
     if (success) {
-      setSnackbarOpen(true);
+      showToast('일정이 저장되었습니다!');
     }
   };
 
-  const handleSnackbarClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setSnackbarOpen(false);
-  };
 
   if (isEventLoading || !eventDetails) {
     return (
@@ -75,17 +77,12 @@ function EventPageWrapper() {
         respondedUsers={respondedUsers}
         fixedSchedule={fixedSchedule}
       />
-      <Snackbar 
-        open={snackbarOpen} 
-        autoHideDuration={3000} 
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert onClose={handleSnackbarClose} severity="success" sx={{ width: '100%', maxWidth: 400 }}>
-          일정이 저장되었습니다!
-        </Alert>
-      </Snackbar>
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
     </Layout>
   );
 }
@@ -102,6 +99,17 @@ function HomePageWrapper() {
 }
 
 export default function App() {
+  const { i18n } = useTranslation();
+  
+  useEffect(() => {
+    // Update document title based on language
+    if (i18n.language.startsWith('ko')) {
+      document.title = 'TimeCheck - 모임 일정 정하기';
+    } else {
+      document.title = 'TimeCheck - Group Scheduling';
+    }
+  }, [i18n.language]);
+  
   return (
     <ThemeProvider theme={theme}>
       <GoogleOAuthProvider>
@@ -112,6 +120,7 @@ export default function App() {
             <Route path="/my-events" element={<MyEventsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/about-us" element={<Layout><AboutUsPage /></Layout>} />
           </Routes>
         </Router>
       </GoogleOAuthProvider>

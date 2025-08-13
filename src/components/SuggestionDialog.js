@@ -9,27 +9,26 @@ import {
   Box,
   Typography,
   IconButton,
-  Snackbar,
-  Alert,
   CircularProgress
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { db } from '../config/firebase';
+import Toast from './Toast';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const SuggestionDialog = ({ open, onClose }) => {
   const [suggestion, setSuggestion] = useState('');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [toast, setToast] = useState({ open: false, message: '', severity: 'success' });
+
+  const showToast = (message, severity = 'success') => {
+    setToast({ open: true, message, severity });
+  };
 
   const handleSubmit = async () => {
     if (!suggestion.trim()) {
-      setSnackbar({ 
-        open: true, 
-        message: '제안 내용을 입력해주세요.', 
-        severity: 'error' 
-      });
+      showToast('제안 내용을 입력해주세요.', 'error');
       return;
     }
 
@@ -44,11 +43,7 @@ const SuggestionDialog = ({ open, onClose }) => {
         timestamp: new Date().toISOString()
       });
 
-      setSnackbar({ 
-        open: true, 
-        message: '소중한 제안 감사합니다! 검토 후 반영하도록 하겠습니다.', 
-        severity: 'success' 
-      });
+      showToast('소중한 제안 감사합니다! 검토 후 반영하도록 하겠습니다.', 'success');
       
       // Reset form
       setSuggestion('');
@@ -57,11 +52,7 @@ const SuggestionDialog = ({ open, onClose }) => {
     } catch (error) {
       console.error('Error submitting suggestion:', error);
       console.error('Error details:', error.code, error.message);
-      setSnackbar({ 
-        open: true, 
-        message: `제안 전송에 실패했습니다: ${error.message}`, 
-        severity: 'error' 
-      });
+      showToast(`제안 전송에 실패했습니다: ${error.message}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -202,21 +193,12 @@ const SuggestionDialog = ({ open, onClose }) => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={4000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        sx={{ bottom: { xs: 16, sm: 24 }, left: { xs: 16, sm: 24 } }}
-      >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
-          severity={snackbar.severity}
-          sx={{ width: '100%', maxWidth: 400 }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      <Toast
+        open={toast.open}
+        message={toast.message}
+        severity={toast.severity}
+        onClose={() => setToast({ ...toast, open: false })}
+      />
     </>
   );
 };
